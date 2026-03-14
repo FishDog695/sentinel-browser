@@ -9,6 +9,17 @@ const EMPTY_TRACKERS = new Map<string, TrackerDetection>()
 const EMPTY_FP: FingerprintEvent[] = []
 const EMPTY_TECH: TechDetection[] = []
 
+const CLAUDE_MODELS = [
+  { id: 'claude-opus-4-5',   label: 'Opus (Most Capable)' },
+  { id: 'claude-sonnet-4-5', label: 'Sonnet (Balanced)' },
+]
+
+const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Fast)' },
+  { id: 'gemini-2.0-pro',   label: 'Gemini 2.0 Pro' },
+  { id: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro' },
+]
+
 export function AIPanel() {
   const activeTabId = useSiteStore(s => s.activeTabId)
   const nav = useSiteStore(s => s.tabs[activeTabId]?.nav)
@@ -24,19 +35,35 @@ export function AIPanel() {
   const aiError = useSiteStore(s => s.tabs[activeTabId]?.aiError ?? null)
 
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
+  const [hasGeminiKey, setHasGeminiKey] = useState<boolean | null>(null)
+  const [provider, setProvider] = useState<'claude' | 'gemini'>('claude')
+  const [selectedModel, setSelectedModel] = useState<string>('claude-opus-4-5')
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyInput, setKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
 
   useEffect(() => {
-    ipc.getApiKey().then(setHasApiKey)
+    Promise.all([ipc.getApiKey(), ipc.getGeminiKey(), ipc.getAiProvider(), ipc.getAiModel()])
+      .then(([claude, gemini, prov, model]) => {
+        setHasApiKey(claude)
+        setHasGeminiKey(gemini)
+        setProvider(prov)
+        setSelectedModel(model)
+      })
   }, [])
+
+  const hasCurrentKey = provider === 'claude' ? hasApiKey : hasGeminiKey
 
   async function handleSaveKey() {
     if (!keyInput.trim()) return
     setSavingKey(true)
-    await ipc.setApiKey(keyInput.trim())
-    setHasApiKey(true)
+    if (provider === 'claude') {
+      await ipc.setApiKey(keyInput.trim())
+      setHasApiKey(true)
+    } else {
+      await ipc.setGeminiKey(keyInput.trim())
+      setHasGeminiKey(true)
+    }
     setShowKeyInput(false)
     setKeyInput('')
     setSavingKey(false)
@@ -80,12 +107,56 @@ export function AIPanel() {
     return <div className="flex items-center justify-center h-32 text-gray-500 text-sm">Loading...</div>
   }
 
+  const keyPlaceholder = provider === 'claude' ? 'sk-ant-...' : 'AIza...'
+  const keyLabel = provider === 'claude'
+    ? 'Enter your Anthropic API key to enable AI analysis. Stored encrypted on your device.'
+    : 'Enter your Google Gemini API key to enable AI analysis. Stored encrypted on your device.'
+  const keyUpdateLabel = provider === 'claude' ? 'Update your Anthropic API key:' : 'Update your Google Gemini API key:'
+
   return (
     <div className="flex flex-col h-full p-3 gap-3">
-      {!hasApiKey || showKeyInput ? (
+      {/* Provider toggle + model selector */}
+      <div className="flex flex-col gap-2 shrink-0">
+        <div className="flex rounded-lg overflow-hidden border border-gray-700">
+          {(['claude', 'gemini'] as const).map(p => (
+            <button
+              key={p}
+              type="button"
+              onClick={async () => {
+                setProvider(p)
+                await ipc.setAiProvider(p)
+                // Load the saved model for the newly selected provider
+                const model = await ipc.getAiModel()
+                setSelectedModel(model)
+                setShowKeyInput(false)
+                setKeyInput('')
+              }}
+              className={provider === p
+                ? 'flex-1 py-1 text-xs font-medium bg-blue-600 text-white'
+                : 'flex-1 py-1 text-xs font-medium bg-gray-800 text-gray-400 hover:text-gray-200'}
+            >
+              {p === 'claude' ? '🤖 Claude' : '✨ Gemini'}
+            </button>
+          ))}
+        </div>
+        <select
+          value={selectedModel}
+          onChange={async (e) => {
+            setSelectedModel(e.target.value)
+            await ipc.setAiModel(e.target.value)
+          }}
+          className="w-full bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 px-2 py-1 focus:outline-none focus:border-blue-500"
+        >
+          {(provider === 'claude' ? CLAUDE_MODELS : GEMINI_MODELS).map(m => (
+            <option key={m.id} value={m.id}>{m.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {!hasCurrentKey || showKeyInput ? (
         <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
           <p className="text-xs text-gray-300 mb-2">
-            {hasApiKey ? 'Update your Anthropic API key:' : 'Enter your Anthropic API key to enable AI analysis. Your key is stored encrypted on your device and never leaves it.'}
+            {hasCurrentKey ? keyUpdateLabel : keyLabel}
           </p>
           <div className="flex gap-2">
             <input
@@ -93,7 +164,7 @@ export function AIPanel() {
               value={keyInput}
               onChange={e => setKeyInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSaveKey()}
-              placeholder="sk-ant-..."
+              placeholder={keyPlaceholder}
               className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500 font-mono"
             />
             <button
@@ -103,8 +174,8 @@ export function AIPanel() {
             >
               {savingKey ? '...' : 'Save'}
             </button>
-            {hasApiKey && (
-              <button onClick={() => setShowKeyInput(false)} className="px-2 py-1 text-gray-400 hover:text-gray-200 text-xs">
+            {hasCurrentKey && (
+              <button onClick={() => { setShowKeyInput(false); setKeyInput('') }} className="px-2 py-1 text-gray-400 hover:text-gray-200 text-xs">
                 Cancel
               </button>
             )}
@@ -112,7 +183,7 @@ export function AIPanel() {
         </div>
       ) : null}
 
-      {hasApiKey && !showKeyInput && (
+      {hasCurrentKey && !showKeyInput && (
         <div className="flex gap-2 shrink-0">
           {aiStreaming ? (
             <button
@@ -140,7 +211,7 @@ export function AIPanel() {
         </div>
       )}
 
-      {!aiAnalysis && !aiStreaming && hasApiKey && !showKeyInput && (
+      {!aiAnalysis && !aiStreaming && hasCurrentKey && !showKeyInput && (
         <div className="text-xs text-gray-500 space-y-1">
           <div>Ready to analyze: <span className="text-gray-300">{nav?.title || nav?.url}</span></div>
           <div className="flex gap-3">
