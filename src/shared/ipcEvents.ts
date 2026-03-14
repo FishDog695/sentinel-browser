@@ -49,6 +49,12 @@ export const IPC = {
   AI_CANCEL:        'ai:cancel',
   GET_API_KEY:      'settings:get-api-key',
   SET_API_KEY:      'settings:set-api-key',
+  GET_GEMINI_KEY:   'settings:get-gemini-key',
+  SET_GEMINI_KEY:   'settings:set-gemini-key',
+  GET_AI_PROVIDER:  'settings:get-ai-provider',
+  SET_AI_PROVIDER:  'settings:set-ai-provider',
+  GET_AI_MODEL:     'settings:get-ai-model',
+  SET_AI_MODEL:     'settings:set-ai-model',
 
   // Tabs — Renderer → Main (invoke)
   TAB_CREATE: 'tab:create',

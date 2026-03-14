@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelAnalysis: () => ipcRenderer.invoke(IPC.AI_CANCEL),
   getApiKey: () => ipcRenderer.invoke(IPC.GET_API_KEY),
   setApiKey: (key: string) => ipcRenderer.invoke(IPC.SET_API_KEY, key),
+  getGeminiKey: (): Promise<boolean> => ipcRenderer.invoke(IPC.GET_GEMINI_KEY),
+  setGeminiKey: (key: string) => ipcRenderer.invoke(IPC.SET_GEMINI_KEY, key),
+  getAiProvider: (): Promise<'claude' | 'gemini'> => ipcRenderer.invoke(IPC.GET_AI_PROVIDER),
+  setAiProvider: (p: 'claude' | 'gemini') => ipcRenderer.invoke(IPC.SET_AI_PROVIDER, p),
+  getAiModel: (): Promise<string> => ipcRenderer.invoke(IPC.GET_AI_MODEL),
+  setAiModel: (model: string) => ipcRenderer.invoke(IPC.SET_AI_MODEL, model),
 
   // Tabs
   createTab: () => ipcRenderer.invoke(IPC.TAB_CREATE),

@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@google/generative-ai": "^0.24.1",
     "@tanstack/react-virtual": "^3.10.0",
     "electron-store": "^8.2.0",
     "tldts": "^6.1.0",

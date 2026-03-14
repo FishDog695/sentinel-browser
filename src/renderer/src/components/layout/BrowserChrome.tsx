@@ -4,7 +4,7 @@ import { ipc } from '../../lib/ipc'
 import type { Favorite, HistoryEntry } from '../../store/siteStore'
 
 // Height to push WebContentsView down when a toolbar dropdown is open.
-// Covers the tallest possible dropdown (max-h-80 = 320px + button + spacing).
+// Covers the tallest possible dropdown (max-h-60 = 240px list + ~72px footer/button/spacing ≈ 312px).
 const DROPDOWN_OVERLAY_PX = 340
 
 function getHostname(url: string): string {
@@ -226,7 +226,7 @@ function HistoryDropdown() {
             <div className="px-4 py-6 text-center text-sm text-gray-500">No browsing history yet.</div>
           ) : (
             <>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-60 overflow-y-auto">
                 {history.map((entry: HistoryEntry) => (
                   <div
                     key={entry.url + entry.visitedAt}

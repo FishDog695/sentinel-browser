@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, safeStorage } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import Store from 'electron-store'
 import { IPC, AIAnalysisRequest, Favorite, HistoryEntry } from '../shared/ipcEvents'
 import {
@@ -7,9 +8,26 @@ import {
 } from './tabManager'
 import { WindowDimensions } from './window'
 
-const store = new Store<{ apiKey: string; favorites: Favorite[]; history: HistoryEntry[] }>()
+const store = new Store<{
+  apiKey: string; geminiApiKey: string
+  aiProvider: 'claude' | 'gemini'
+  claudeModel: string; geminiModel: string
+  favorites: Favorite[]; history: HistoryEntry[]
+}>()
 let anthropic: Anthropic | null = null
+let geminiAI: GoogleGenerativeAI | null = null
 let currentAnalysisController: AbortController | null = null
+
+function getGeminiClient(): GoogleGenerativeAI | null {
+  if (geminiAI) return geminiAI
+  const encKey = store.get('geminiApiKey')
+  if (!encKey) return null
+  try {
+    const key = safeStorage.decryptString(Buffer.from(encKey, 'base64'))
+    geminiAI = new GoogleGenerativeAI(key)
+    return geminiAI
+  } catch { return null }
+}
 
 function getAnthropicClient(): Anthropic | null {
   if (anthropic) return anthropic
@@ -289,6 +307,36 @@ export function registerIpcHandlers(
 
   // ─── AI Analysis ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.AI_ANALYZE, async (event, req: AIAnalysisRequest) => {
+    const provider = store.get('aiProvider', 'claude')
+
+    if (provider === 'gemini') {
+      const genAI = getGeminiClient()
+      if (!genAI) {
+        event.sender.send(IPC.AI_STREAM_ERROR, { message: 'No Gemini API key configured. Add it in AI panel settings.' })
+        return
+      }
+      if (currentAnalysisController) currentAnalysisController.abort()
+      currentAnalysisController = new AbortController()
+      try {
+        const modelId = store.get('geminiModel', 'gemini-2.0-flash')
+        const model = genAI.getGenerativeModel({ model: modelId, systemInstruction: SYSTEM_PROMPT })
+        const result = await model.generateContentStream(buildUserPrompt(req))
+        for await (const chunk of result.stream) {
+          if (currentAnalysisController?.signal.aborted) break
+          const text = chunk.text()
+          if (text) event.sender.send(IPC.AI_STREAM_CHUNK, { text })
+        }
+        if (!currentAnalysisController?.signal.aborted) {
+          event.sender.send(IPC.AI_STREAM_DONE, {})
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Analysis failed'
+        event.sender.send(IPC.AI_STREAM_ERROR, { message })
+      }
+      return
+    }
+
+    // Claude path
     const client = getAnthropicClient()
     if (!client) {
       event.sender.send(IPC.AI_STREAM_ERROR, { message: 'No API key configured. Please add your Anthropic API key in settings.' })
@@ -299,8 +347,9 @@ export function registerIpcHandlers(
     currentAnalysisController = new AbortController()
 
     try {
+      const claudeModel = store.get('claudeModel', 'claude-opus-4-5')
       const stream = await client.messages.stream({
-        model: 'claude-opus-4-6',
+        model: claudeModel,
         max_tokens: 1500,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt(req) }],
@@ -323,5 +372,26 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.AI_CANCEL, () => {
     currentAnalysisController?.abort()
     currentAnalysisController = null
+  })
+
+  // ─── Gemini key + provider + model settings ───────────────────────────────────
+  ipcMain.handle(IPC.GET_GEMINI_KEY, () => !!store.get('geminiApiKey'))
+  ipcMain.handle(IPC.SET_GEMINI_KEY, (_e, apiKey: string) => {
+    store.set('geminiApiKey', safeStorage.encryptString(apiKey).toString('base64'))
+    geminiAI = null
+  })
+  ipcMain.handle(IPC.GET_AI_PROVIDER, () => store.get('aiProvider', 'claude'))
+  ipcMain.handle(IPC.SET_AI_PROVIDER, (_e, provider: 'claude' | 'gemini') => {
+    store.set('aiProvider', provider)
+  })
+  ipcMain.handle(IPC.GET_AI_MODEL, () => {
+    const provider = store.get('aiProvider', 'claude')
+    return provider === 'claude'
+      ? store.get('claudeModel', 'claude-opus-4-5')
+      : store.get('geminiModel', 'gemini-2.0-flash')
+  })
+  ipcMain.handle(IPC.SET_AI_MODEL, (_e, model: string) => {
+    const provider = store.get('aiProvider', 'claude')
+    provider === 'claude' ? store.set('claudeModel', model) : store.set('geminiModel', model)
   })
 }
