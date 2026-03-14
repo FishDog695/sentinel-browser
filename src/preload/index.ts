@@ -19,6 +19,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiKey: () => ipcRenderer.invoke(IPC.GET_API_KEY),
   setApiKey: (key: string) => ipcRenderer.invoke(IPC.SET_API_KEY, key),
 
+  // Tabs
+  createTab: () => ipcRenderer.invoke(IPC.TAB_CREATE),
+  closeTab: (tabId: string) => ipcRenderer.invoke(IPC.TAB_CLOSE, tabId),
+  switchTab: (tabId: string) => ipcRenderer.invoke(IPC.TAB_SWITCH, tabId),
+
+  // Window controls
+  minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),
+  maximizeWindow: () => ipcRenderer.invoke(IPC.WIN_MAXIMIZE),
+  closeWindow: () => ipcRenderer.invoke(IPC.WIN_CLOSE),
+  isMaximized: () => ipcRenderer.invoke(IPC.WIN_IS_MAXIMIZED),
+
+  // Platform
+  platform: process.platform,
+
   // Event listeners — renderer subscribes to push events from main
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...args)

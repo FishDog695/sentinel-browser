@@ -1,11 +1,16 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { createMainWindow } from './window'
-import { setupSessionHooks, setCurrentPageUrl, getScriptUrls } from './session'
+import { createMainWindow, calculateWebViewBounds } from './window'
+import { setupSessionHooks, setTabUrl, getScriptUrls } from './session'
 import { loadTrackerList } from './trackerEngine'
 import { getSnapshotForUrl } from './cookies'
 import { registerIpcHandlers } from './ipcHandlers'
+import { detectFromHtml, detectFromGlobals, mergeDetections } from './techDetector'
+import {
+  createTab, showTab, getWcvByTabId,
+  updateTabMeta, getTabMeta
+} from './tabManager'
 import { IPC } from '../shared/ipcEvents'
 
 // Fingerprint observer injected into every page
@@ -58,6 +63,73 @@ const DOM_SIGNAL_SCRIPT = `(function() {
   return JSON.stringify({ globals: foundGlobals, html });
 })()`
 
+// Wire all per-tab navigation events for a single tab
+export function setupTabEvents(win: BrowserWindow, tabId: string) {
+  const wcv = getWcvByTabId(tabId)
+  if (!wcv) return
+
+  wcv.webContents.on('did-start-loading', () => {
+    win.webContents.send(IPC.NAV_PAGE_LOADING, { tabId, url: wcv.webContents.getURL() })
+  })
+
+  wcv.webContents.on('did-navigate', async (_e, url) => {
+    setTabUrl(tabId, url)
+    updateTabMeta(tabId, { url })
+    win.webContents.send(IPC.NAV_URL_CHANGED, { tabId, url })
+    win.webContents.send(IPC.NAV_HISTORY_CHANGED, {
+      tabId,
+      canGoBack: wcv.webContents.navigationHistory.canGoBack(),
+      canGoForward: wcv.webContents.navigationHistory.canGoForward(),
+    })
+    const cookies = await getSnapshotForUrl(url)
+    win.webContents.send(IPC.COOKIES_SNAPSHOT, { cookies, tabId })
+  })
+
+  wcv.webContents.on('did-navigate-in-page', (_e, url) => {
+    updateTabMeta(tabId, { url })
+    win.webContents.send(IPC.NAV_URL_CHANGED, { tabId, url })
+  })
+
+  wcv.webContents.on('page-title-updated', (_e, title) => {
+    updateTabMeta(tabId, { title })
+    win.webContents.send(IPC.NAV_TITLE_CHANGED, { tabId, title })
+    const m = getTabMeta(tabId)
+    if (m) win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+  })
+
+  wcv.webContents.on('did-finish-load', async () => {
+    win.webContents.send(IPC.NAV_PAGE_LOADED, { tabId })
+
+    await wcv.webContents.executeJavaScript(FINGERPRINT_SCRIPT).catch(() => {})
+
+    const result = await wcv.webContents.executeJavaScript(DOM_SIGNAL_SCRIPT).catch(() => null)
+    if (result) {
+      const { globals, html } = JSON.parse(result)
+      const techHtml = detectFromHtml(html, getScriptUrls(tabId))
+      const techGlobals = detectFromGlobals(globals)
+      const merged = mergeDetections([...techHtml, ...techGlobals])
+      if (merged.length > 0) {
+        win.webContents.send(IPC.TECH_DETECTED, { items: merged, tabId })
+      }
+    }
+  })
+
+  wcv.webContents.on('ipc-message', (_e, channel, ...args) => {
+    if (channel === '__sentinel_fp__') {
+      win.webContents.send(IPC.FINGERPRINT_ATTEMPT, { ...args[0], timestamp: Date.now(), tabId })
+    }
+  })
+
+  wcv.webContents.on('page-favicon-updated', (_e, favicons) => {
+    if (favicons.length > 0) {
+      updateTabMeta(tabId, { favicon: favicons[0] })
+      win.webContents.send(IPC.NAV_FAVICON, { tabId, url: favicons[0] })
+      const m = getTabMeta(tabId)
+      if (m) win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+    }
+  })
+}
+
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.sentinel.browser')
 
@@ -69,67 +141,41 @@ app.whenReady().then(async () => {
   const resourcesPath = app.isPackaged ? process.resourcesPath : join(__dirname, '../../resources')
   loadTrackerList(resourcesPath)
 
-  const { win, wcv, updateWebViewBounds, setPanelWidth } = createMainWindow()
+  const { win, updateWebViewBounds, getPanelWidth, setPanelWidth } = createMainWindow()
 
-  // Setup network/cookie hooks
+  // Create the initial tab
+  const { tabId, wcv } = createTab(win)
+
+  // Setup session hooks ONCE (shared session across all tabs)
   setupSessionHooks(win, wcv)
 
-  // Register all IPC handlers
-  registerIpcHandlers(win, wcv, setPanelWidth, updateWebViewBounds)
+  // Wire navigation events for the initial tab
+  setupTabEvents(win, tabId)
 
-  // ─── WebContentsView navigation events ─────────────────────────────────────
-  wcv.webContents.on('did-start-loading', () => {
-    win.webContents.send(IPC.NAV_PAGE_LOADING, { url: wcv.webContents.getURL() })
-  })
+  // Register all IPC handlers, passing setupTabEvents so TAB_CREATE can wire new tabs
+  registerIpcHandlers(win, setupTabEvents, calculateWebViewBounds, getPanelWidth, setPanelWidth, updateWebViewBounds)
 
-  wcv.webContents.on('did-navigate', async (_e, url) => {
-    setCurrentPageUrl(url)
-    win.webContents.send(IPC.NAV_URL_CHANGED, { url })
-    win.webContents.send(IPC.NAV_HISTORY_CHANGED, {
-      canGoBack: wcv.webContents.navigationHistory.canGoBack(),
-      canGoForward: wcv.webContents.navigationHistory.canGoForward(),
-    })
-    // Send cookie snapshot for the new page
-    const cookies = await getSnapshotForUrl(url)
-    win.webContents.send(IPC.COOKIES_SNAPSHOT, cookies)
-  })
+  // Show the initial tab with correct bounds
+  const [w, h] = win.getContentSize()
+  const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
+  showTab(tabId, bounds)
 
-  wcv.webContents.on('did-navigate-in-page', (_e, url) => {
-    win.webContents.send(IPC.NAV_URL_CHANGED, { url })
-  })
-
-  wcv.webContents.on('page-title-updated', (_e, title) => {
-    win.webContents.send(IPC.NAV_TITLE_CHANGED, { title })
-  })
-
-  wcv.webContents.on('did-finish-load', async () => {
-    // Inject fingerprint observer
-    await wcv.webContents.executeJavaScript(FINGERPRINT_SCRIPT).catch(() => {})
-
-    // Collect DOM signals for tech detection
-    const result = await wcv.webContents.executeJavaScript(DOM_SIGNAL_SCRIPT).catch(() => null)
-    if (result) {
-      const { globals, html } = JSON.parse(result)
-      // Send to ipcHandlers via internal IPC
-      win.webContents.emit('tech-dom-signals', { globals, html, scriptUrls: getScriptUrls() })
+  // Notify renderer of the initial tab (once renderer has loaded)
+  win.webContents.on('did-finish-load', () => {
+    const meta = getTabMeta(tabId)
+    if (meta) {
+      win.webContents.send(IPC.TAB_CREATED, {
+        tabId: meta.id,
+        url: meta.url,
+        title: meta.title,
+        favicon: meta.favicon,
+        isActive: true,
+      })
     }
-  })
-
-  // Forward fingerprint events from WebContentsView preload
-  wcv.webContents.on('ipc-message', (_e, channel, ...args) => {
-    if (channel === '__sentinel_fp__') {
-      win.webContents.send(IPC.FINGERPRINT_ATTEMPT, { ...args[0], timestamp: Date.now() })
-    }
-  })
-
-  // Page favicon
-  wcv.webContents.on('page-favicon-updated', (_e, favicons) => {
-    if (favicons.length > 0) win.webContents.send(IPC.NAV_FAVICON, { url: favicons[0] })
   })
 
   // Load initial page
   await wcv.webContents.loadURL('https://example.com')
-  updateWebViewBounds()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

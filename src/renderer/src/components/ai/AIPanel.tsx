@@ -1,22 +1,27 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 import { ipc } from '../../lib/ipc'
-import type { AIAnalysisRequest } from '../../../../../shared/ipcEvents'
+import type { AIAnalysisRequest, CookieEvent, NetworkRequest, TrackerDetection, FingerprintEvent, TechDetection } from '../../../../../shared/ipcEvents'
+
+const EMPTY_COOKIES = new Map<string, CookieEvent>()
+const EMPTY_REQUESTS: NetworkRequest[] = []
+const EMPTY_TRACKERS = new Map<string, TrackerDetection>()
+const EMPTY_FP: FingerprintEvent[] = []
+const EMPTY_TECH: TechDetection[] = []
 
 export function AIPanel() {
-  const nav = useSiteStore(s => s.nav)
-  const cookiesMap = useSiteStore(s => s.cookies)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const nav = useSiteStore(s => s.tabs[activeTabId]?.nav)
+  const cookiesMap = useSiteStore(s => s.tabs[activeTabId]?.cookies ?? EMPTY_COOKIES)
   const cookies = useMemo(() => Array.from(cookiesMap.values()), [cookiesMap])
-  const requests = useSiteStore(s => s.networkRequests)
-  const trackersMap = useSiteStore(s => s.trackers)
+  const requests = useSiteStore(s => s.tabs[activeTabId]?.networkRequests ?? EMPTY_REQUESTS)
+  const trackersMap = useSiteStore(s => s.tabs[activeTabId]?.trackers ?? EMPTY_TRACKERS)
   const trackers = useMemo(() => Array.from(trackersMap.values()), [trackersMap])
-  const fps = useSiteStore(s => s.fingerprintAttempts)
-  const tech = useSiteStore(s => s.techStack)
-  const aiAnalysis = useSiteStore(s => s.aiAnalysis)
-  const aiStreaming = useSiteStore(s => s.aiStreaming)
-  const aiError = useSiteStore(s => s.aiError)
-  const setAiStreaming = useSiteStore(s => s.setAiStreaming)
-  const clearAiAnalysis = useSiteStore(s => s.clearAiAnalysis)
+  const fps = useSiteStore(s => s.tabs[activeTabId]?.fingerprintAttempts ?? EMPTY_FP)
+  const tech = useSiteStore(s => s.tabs[activeTabId]?.techStack ?? EMPTY_TECH)
+  const aiAnalysis = useSiteStore(s => s.tabs[activeTabId]?.aiAnalysis ?? '')
+  const aiStreaming = useSiteStore(s => s.tabs[activeTabId]?.aiStreaming ?? false)
+  const aiError = useSiteStore(s => s.tabs[activeTabId]?.aiError ?? null)
 
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
   const [showKeyInput, setShowKeyInput] = useState(false)
@@ -38,9 +43,9 @@ export function AIPanel() {
   }
 
   async function handleAnalyze() {
-    if (!nav.url) return
-    clearAiAnalysis()
-    setAiStreaming(true)
+    if (!nav?.url) return
+    useSiteStore.getState().clearTabAiAnalysis(activeTabId)
+    useSiteStore.getState().setTabAiStreaming(activeTabId, true)
 
     const thirdPartyDomains = [...new Set(
       requests.filter(r => !r.firstParty).map(r => {
@@ -68,7 +73,7 @@ export function AIPanel() {
 
   function handleCancel() {
     ipc.cancelAnalysis()
-    setAiStreaming(false)
+    useSiteStore.getState().setTabAiStreaming(activeTabId, false)
   }
 
   if (hasApiKey === null) {
@@ -77,7 +82,6 @@ export function AIPanel() {
 
   return (
     <div className="flex flex-col h-full p-3 gap-3">
-      {/* API key setup */}
       {!hasApiKey || showKeyInput ? (
         <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
           <p className="text-xs text-gray-300 mb-2">
@@ -108,7 +112,6 @@ export function AIPanel() {
         </div>
       ) : null}
 
-      {/* Analyze button */}
       {hasApiKey && !showKeyInput && (
         <div className="flex gap-2 shrink-0">
           {aiStreaming ? (
@@ -121,7 +124,7 @@ export function AIPanel() {
           ) : (
             <button
               onClick={handleAnalyze}
-              disabled={!nav.url}
+              disabled={!nav?.url}
               className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-lg font-medium"
             >
               Analyze This Site
@@ -137,10 +140,9 @@ export function AIPanel() {
         </div>
       )}
 
-      {/* Context summary */}
       {!aiAnalysis && !aiStreaming && hasApiKey && !showKeyInput && (
         <div className="text-xs text-gray-500 space-y-1">
-          <div>Ready to analyze: <span className="text-gray-300">{nav.title || nav.url}</span></div>
+          <div>Ready to analyze: <span className="text-gray-300">{nav?.title || nav?.url}</span></div>
           <div className="flex gap-3">
             <span>{cookies.length} cookies</span>
             <span>{requests.length} requests</span>
@@ -149,14 +151,12 @@ export function AIPanel() {
         </div>
       )}
 
-      {/* Analysis output */}
       {(aiAnalysis || aiStreaming) && (
         <div className="flex-1 overflow-y-auto">
           <AnalysisOutput text={aiAnalysis} streaming={aiStreaming} />
         </div>
       )}
 
-      {/* Error */}
       {aiError && (
         <div className="bg-red-500/10 border border-red-500/30 rounded p-2 text-xs text-red-400">
           {aiError}
@@ -167,14 +167,11 @@ export function AIPanel() {
 }
 
 function AnalysisOutput({ text, streaming }: { text: string; streaming: boolean }) {
-  // Simple markdown rendering: bold headers (**text**) and line breaks
   const lines = text.split('\n')
-
   return (
     <div className="text-sm text-gray-200 space-y-2">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-2" />
-        // Render **bold** text
         const parts = line.split(/(\*\*[^*]+\*\*)/)
         return (
           <p key={i} className="leading-relaxed">

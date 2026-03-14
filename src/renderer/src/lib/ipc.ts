@@ -13,6 +13,14 @@ declare global {
       cancelAnalysis: () => Promise<void>
       getApiKey: () => Promise<boolean>
       setApiKey: (key: string) => Promise<void>
+      createTab: () => Promise<string>
+      closeTab: (tabId: string) => Promise<void>
+      switchTab: (tabId: string) => Promise<void>
+      minimizeWindow: () => Promise<void>
+      maximizeWindow: () => Promise<void>
+      closeWindow: () => Promise<void>
+      isMaximized: () => Promise<boolean>
+      platform: string
       on: (channel: string, cb: (...args: unknown[]) => void) => () => void
       IPC: Record<string, string>
     }
@@ -29,6 +37,14 @@ export const ipc = {
   cancelAnalysis: () => window.electronAPI.cancelAnalysis(),
   getApiKey: () => window.electronAPI.getApiKey(),
   setApiKey: (key: string) => window.electronAPI.setApiKey(key),
+  createTab: () => window.electronAPI.createTab(),
+  closeTab: (tabId: string) => window.electronAPI.closeTab(tabId),
+  switchTab: (tabId: string) => window.electronAPI.switchTab(tabId),
+  minimizeWindow: () => window.electronAPI.minimizeWindow(),
+  maximizeWindow: () => window.electronAPI.maximizeWindow(),
+  closeWindow: () => window.electronAPI.closeWindow(),
+  isMaximized: () => window.electronAPI.isMaximized(),
+  platform: () => window.electronAPI.platform,
   on: (channel: string, cb: (...args: unknown[]) => void) => window.electronAPI.on(channel, cb),
   IPC: () => window.electronAPI.IPC,
 }

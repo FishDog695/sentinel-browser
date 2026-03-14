@@ -4,19 +4,27 @@ import { IPC, NetworkRequest, NetworkResponse } from '../shared/ipcEvents'
 import { matchTracker } from './trackerEngine'
 import { electronCookieToEvent, isFirstParty } from './cookies'
 import { detectFromHeaders } from './techDetector'
+import { getTabIdByWcId, getActiveTabId } from './tabManager'
 
-let currentPageUrl = ''
+// Per-tab URL tracking (for first-party determination)
+const tabUrls = new Map<string, string>()
+// Per-tab script URLs for tech detection
+const tabScriptUrls = new Map<string, Set<string>>()
 const requestTimestamps = new Map<string, number>()
 const requestFirstPartyCache = new Map<string, boolean>()
-const scriptUrlsByPage = new Set<string>()
 
-export function setCurrentPageUrl(url: string) {
-  currentPageUrl = url
-  scriptUrlsByPage.clear()
+export function setTabUrl(tabId: string, url: string) {
+  tabUrls.set(tabId, url)
+  tabScriptUrls.set(tabId, new Set())
 }
 
-export function getScriptUrls(): string[] {
-  return Array.from(scriptUrlsByPage)
+export function getTabUrl(tabId: string): string {
+  return tabUrls.get(tabId) ?? ''
+}
+
+export function getScriptUrls(tabId?: string): string[] {
+  const id = tabId ?? getActiveTabId()
+  return Array.from(tabScriptUrls.get(id) ?? [])
 }
 
 function getEtldPlusOne(url: string): string {
@@ -26,30 +34,39 @@ function getEtldPlusOne(url: string): string {
   } catch { return '' }
 }
 
+// setupSessionHooks is called ONCE per window — the session is shared across all tabs
 export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
   const ses = wcv.webContents.session
 
   // ─── Cookies ────────────────────────────────────────────────────────────────
+  // Cookie events are session-level; route them to the currently active tab
   ses.cookies.on('changed', (_event, cookie, cause, removed) => {
-    const event = electronCookieToEvent(cookie, currentPageUrl)
+    const activeId = getActiveTabId()
+    const pageUrl = tabUrls.get(activeId) ?? ''
+    const event = electronCookieToEvent(cookie, pageUrl)
     if (removed) {
-      win.webContents.send(IPC.COOKIE_REMOVED, event)
+      win.webContents.send(IPC.COOKIE_REMOVED, { ...event, tabId: activeId })
     } else if (cause === 'explicit' || cause === 'overwrite') {
-      win.webContents.send(IPC.COOKIE_ADDED, event)
+      win.webContents.send(IPC.COOKIE_ADDED, { ...event, tabId: activeId })
     } else {
-      win.webContents.send(IPC.COOKIE_CHANGED, event)
+      win.webContents.send(IPC.COOKIE_CHANGED, { ...event, tabId: activeId })
     }
   })
 
   // ─── Network requests ────────────────────────────────────────────────────────
+  // Route each request to the tab that made it via webContentsId
   ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
-    const firstParty = isFirstParty(getEtldPlusOne(details.url), currentPageUrl)
+    // webContentsId is available in Electron 33+ onBeforeRequest details
+    const wcId = (details as unknown as { webContentsId?: number }).webContentsId ?? 0
+    const tabId = getTabIdByWcId(wcId)
+    const pageUrl = tabUrls.get(tabId) ?? ''
+    const firstParty = isFirstParty(getEtldPlusOne(details.url), pageUrl)
     requestFirstPartyCache.set(details.id.toString(), firstParty)
     requestTimestamps.set(details.id.toString(), Date.now())
 
-    // Track script src URLs for tech detection
     if (details.resourceType === 'script') {
-      scriptUrlsByPage.add(details.url)
+      if (!tabScriptUrls.has(tabId)) tabScriptUrls.set(tabId, new Set())
+      tabScriptUrls.get(tabId)!.add(details.url)
     }
 
     const trackerMatch = matchTracker(details.url)
@@ -59,14 +76,14 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       url: details.url,
       method: details.method,
       resourceType: details.resourceType,
-      initiator: details.initiator ?? '',
+      initiator: (details as unknown as { initiator?: string }).initiator ?? '',
       timestamp: Date.now(),
       firstParty,
       trackerMatch: trackerMatch?.company,
       trackerCategory: trackerMatch?.category,
     }
 
-    win.webContents.send(IPC.NETWORK_REQUEST, req)
+    win.webContents.send(IPC.NETWORK_REQUEST, { ...req, tabId })
 
     if (trackerMatch) {
       win.webContents.send(IPC.TRACKER_DETECTED, {
@@ -74,6 +91,7 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
         category: trackerMatch.category,
         name: trackerMatch.company,
         domain: trackerMatch.domain,
+        tabId,
       })
     }
 
@@ -82,6 +100,8 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
 
   // ─── Network responses ───────────────────────────────────────────────────────
   ses.webRequest.onResponseStarted({ urls: ['<all_urls>'] }, (details) => {
+    const wcId = (details as unknown as { webContentsId?: number }).webContentsId ?? 0
+    const tabId = getTabIdByWcId(wcId)
     const start = requestTimestamps.get(details.id.toString()) ?? Date.now()
     const timing = Date.now() - start
 
@@ -98,13 +118,12 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       timing,
     }
 
-    win.webContents.send(IPC.NETWORK_RESPONSE, resp)
+    win.webContents.send(IPC.NETWORK_RESPONSE, { ...resp, tabId })
 
-    // Tech detection from response headers (main document only)
     if (details.resourceType === 'mainFrame' && details.statusCode < 400) {
       const techFromHeaders = detectFromHeaders(headers)
       if (techFromHeaders.length > 0) {
-        win.webContents.send(IPC.TECH_DETECTED, techFromHeaders)
+        win.webContents.send(IPC.TECH_DETECTED, { items: techFromHeaders, tabId })
       }
     }
   })

@@ -1,10 +1,11 @@
-import { ipcMain, BrowserWindow, WebContentsView, safeStorage } from 'electron'
+import { ipcMain, BrowserWindow, safeStorage } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import Store from 'electron-store'
 import { IPC, AIAnalysisRequest } from '../shared/ipcEvents'
-import { getSnapshotForUrl } from './cookies'
-import { detectFromHtml, detectFromGlobals, mergeDetections } from './techDetector'
-import { getScriptUrls } from './session'
+import {
+  createTab, showTab, closeTab, getActiveWcv, getTabMeta,
+} from './tabManager'
+import { WindowDimensions } from './window'
 
 const store = new Store<{ apiKey: string }>()
 let anthropic: Anthropic | null = null
@@ -83,7 +84,6 @@ const HIGH_RISK_DOMAINS: Record<string, string> = {
   'rambler.ru': 'Russia (Rambler)',
   // Iran
   'aparat.com': 'Iran (Aparat)',
-  // North Korea — most NK traffic routes through China
 }
 
 // High-risk country-code TLDs
@@ -95,10 +95,9 @@ const HIGH_RISK_CCTLDS: Record<string, string> = {
 
 function buildGeoSection(thirdPartyDomains: string[], trackerDomains: string[]): string {
   const allDomains = [...new Set([...thirdPartyDomains, ...trackerDomains])]
-  const hits = new Map<string, string[]>() // label → [matched domains]
+  const hits = new Map<string, string[]>()
 
   for (const hostname of allDomains) {
-    // Check known company map (match on base domain suffix)
     for (const [baseDomain, label] of Object.entries(HIGH_RISK_DOMAINS)) {
       if (hostname === baseDomain || hostname.endsWith('.' + baseDomain)) {
         const existing = hits.get(label) ?? []
@@ -106,10 +105,7 @@ function buildGeoSection(thirdPartyDomains: string[], trackerDomains: string[]):
         break
       }
     }
-
-    // Check ccTLD
-    const parts = hostname.split('.')
-    const tld = parts[parts.length - 1].toLowerCase()
+    const tld = hostname.split('.').pop()?.toLowerCase() ?? ''
     const country = HIGH_RISK_CCTLDS[tld]
     if (country) {
       const label = country + ' (ccTLD .' + tld + ')'
@@ -121,7 +117,6 @@ function buildGeoSection(thirdPartyDomains: string[], trackerDomains: string[]):
   if (hits.size === 0) {
     return 'GEOGRAPHIC CONNECTIONS: None detected via domain analysis — use your knowledge to assess any tracker or company names above.'
   }
-
   const lines = ['GEOGRAPHIC CONNECTIONS (detected via domain analysis):']
   for (const [label, domains] of hits) {
     lines.push('- ' + label + ': ' + domains.join(', '))
@@ -165,38 +160,69 @@ function buildUserPrompt(req: AIAnalysisRequest): string {
 
 export function registerIpcHandlers(
   win: BrowserWindow,
-  wcv: WebContentsView,
+  // Passed from index.ts so TAB_CREATE can wire events for new tabs without circular deps
+  setupTabEvents: (win: BrowserWindow, tabId: string) => void,
+  calculateWebViewBounds: (dims: WindowDimensions) => Electron.Rectangle,
+  getPanelWidth: () => number,
   setPanelWidth: (w: number) => void,
-  updateWebViewBounds: () => void
+  updateWebViewBounds: () => void,
 ) {
-  // Navigation
+  // ─── Navigation ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.NAVIGATE_TO, async (_e, url: string) => {
+    const wcv = getActiveWcv()
+    if (!wcv) return
     const normalized = url.startsWith('http') ? url : 'https://' + url
     await wcv.webContents.loadURL(normalized)
   })
-  ipcMain.handle(IPC.NAVIGATE_BACK, () => wcv.webContents.navigationHistory.goBack())
-  ipcMain.handle(IPC.NAVIGATE_FORWARD, () => wcv.webContents.navigationHistory.goForward())
-  ipcMain.handle(IPC.NAVIGATE_RELOAD, () => wcv.webContents.reload())
+  ipcMain.handle(IPC.NAVIGATE_BACK, () => getActiveWcv()?.webContents.navigationHistory.goBack())
+  ipcMain.handle(IPC.NAVIGATE_FORWARD, () => getActiveWcv()?.webContents.navigationHistory.goForward())
+  ipcMain.handle(IPC.NAVIGATE_RELOAD, () => getActiveWcv()?.webContents.reload())
 
-  // Panel resize
+  // ─── Panel resize ────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.PANEL_RESIZE, (_e, width: number) => {
     setPanelWidth(width)
   })
 
-  // Cookies snapshot (called on page load)
-  ipcMain.handle('cookie:get-snapshot', async (_e, url: string) => {
-    return getSnapshotForUrl(url)
+  // ─── Tabs ────────────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.TAB_CREATE, async () => {
+    const { tabId, wcv } = createTab(win)
+    setupTabEvents(win, tabId)
+    const [w, h] = win.getContentSize()
+    const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
+    showTab(tabId, bounds)
+    await wcv.webContents.loadURL('https://example.com')
+    const meta = getTabMeta(tabId)!
+    win.webContents.send(IPC.TAB_CREATED, {
+      tabId: meta.id, url: meta.url, title: meta.title, favicon: meta.favicon, isActive: true,
+    })
+    return tabId
   })
 
-  // Tech detection from DOM/globals
-  ipcMain.handle('tech:dom-signals', (_e, data: { html: string; globals: string[] }) => {
-    const fromHtml = detectFromHtml(data.html, getScriptUrls())
-    const fromGlobals = detectFromGlobals(data.globals)
-    const merged = mergeDetections([...fromHtml, ...fromGlobals])
-    if (merged.length > 0) win.webContents.send(IPC.TECH_DETECTED, merged)
+  ipcMain.handle(IPC.TAB_SWITCH, (_e, tabId: string) => {
+    const [w, h] = win.getContentSize()
+    const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
+    showTab(tabId, bounds)
   })
 
-  // API key management
+  ipcMain.handle(IPC.TAB_CLOSE, (_e, tabId: string) => {
+    const nextTabId = closeTab(win, tabId)
+    if (nextTabId) {
+      const [w, h] = win.getContentSize()
+      const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
+      showTab(nextTabId, bounds)
+      win.webContents.send(IPC.TAB_CLOSED, { tabId, nextActiveTabId: nextTabId })
+    } else {
+      win.close()
+    }
+  })
+
+  // ─── Window controls ─────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.WIN_MINIMIZE, () => win.minimize())
+  ipcMain.handle(IPC.WIN_MAXIMIZE, () => win.isMaximized() ? win.unmaximize() : win.maximize())
+  ipcMain.handle(IPC.WIN_CLOSE, () => win.close())
+  ipcMain.handle(IPC.WIN_IS_MAXIMIZED, () => win.isMaximized())
+
+  // ─── API key management ──────────────────────────────────────────────────────
   ipcMain.handle(IPC.GET_API_KEY, () => {
     const encKey = store.get('apiKey')
     return !!encKey
@@ -204,10 +230,10 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.SET_API_KEY, (_e, apiKey: string) => {
     const encrypted = safeStorage.encryptString(apiKey)
     store.set('apiKey', encrypted.toString('base64'))
-    anthropic = null  // reset client with new key
+    anthropic = null
   })
 
-  // AI Analysis
+  // ─── AI Analysis ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.AI_ANALYZE, async (event, req: AIAnalysisRequest) => {
     const client = getAnthropicClient()
     if (!client) {

@@ -9,14 +9,15 @@ import { AIPanel } from '../ai/AIPanel'
 interface Tab { id: PanelTab; label: string; icon: string; getCount?: () => number }
 
 export function SidePanel() {
-  const activeTab = useSiteStore(s => s.activeTab)
+  const activePanel = useSiteStore(s => s.activePanel)
   const isPanelCollapsed = useSiteStore(s => s.isPanelCollapsed)
-  const setActiveTab = useSiteStore(s => s.setActiveTab)
+  const setActivePanel = useSiteStore(s => s.setActivePanel)
   const togglePanel = useSiteStore(s => s.togglePanel)
-  const cookieCount = useSiteStore(s => s.cookies.size)
-  const requestCount = useSiteStore(s => s.networkRequests.length)
-  const trackerCount = useSiteStore(s => s.trackers.size)
-  const techCount = useSiteStore(s => s.techStack.length)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const cookieCount = useSiteStore(s => s.tabs[activeTabId]?.cookies.size ?? 0)
+  const requestCount = useSiteStore(s => s.tabs[activeTabId]?.networkRequests.length ?? 0)
+  const trackerCount = useSiteStore(s => s.tabs[activeTabId]?.trackers.size ?? 0)
+  const techCount = useSiteStore(s => s.tabs[activeTabId]?.techStack.length ?? 0)
 
   const tabs: Tab[] = [
     { id: 'cookies', icon: '🍪', label: 'Cookies', getCount: () => cookieCount },
@@ -41,7 +42,7 @@ export function SidePanel() {
           return (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); togglePanel() }}
+              onClick={() => { setActivePanel(tab.id); togglePanel() }}
               className="w-10 h-10 flex flex-col items-center justify-center rounded hover:bg-gray-800 text-gray-400 relative"
               title={tab.label}
             >
@@ -71,11 +72,11 @@ export function SidePanel() {
         </button>
         {tabs.map(tab => {
           const count = tab.getCount?.() ?? 0
-          const isActive = activeTab === tab.id
+          const isActive = activePanel === tab.id
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActivePanel(tab.id)}
               className={['panel-tab', isActive ? 'panel-tab-active' : ''].join(' ')}
             >
               <span>{tab.icon}</span>
@@ -95,11 +96,11 @@ export function SidePanel() {
 
       {/* Panel content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'cookies' && <CookieInspector />}
-        {activeTab === 'network' && <NetworkMonitor />}
-        {activeTab === 'trackers' && <TrackerPanel />}
-        {activeTab === 'tech' && <TechStack />}
-        {activeTab === 'ai' && <AIPanel />}
+        {activePanel === 'cookies' && <CookieInspector />}
+        {activePanel === 'network' && <NetworkMonitor />}
+        {activePanel === 'trackers' && <TrackerPanel />}
+        {activePanel === 'tech' && <TechStack />}
+        {activePanel === 'ai' && <AIPanel />}
       </div>
     </div>
   )

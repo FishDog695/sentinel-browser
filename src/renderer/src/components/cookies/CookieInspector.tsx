@@ -2,8 +2,11 @@ import { useState, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 import type { CookieEvent } from '../../../../../shared/ipcEvents'
 
+const EMPTY_MAP = new Map<string, CookieEvent>()
+
 export function CookieInspector() {
-  const cookiesMap = useSiteStore(s => s.cookies)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const cookiesMap = useSiteStore(s => s.tabs[activeTabId]?.cookies ?? EMPTY_MAP)
   const cookies = useMemo(() => Array.from(cookiesMap.values()), [cookiesMap])
   const [filter, setFilter] = useState<'all' | 'first' | 'third'>('all')
   const [selected, setSelected] = useState<CookieEvent | null>(null)
@@ -36,7 +39,6 @@ export function CookieInspector() {
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No cookies yet</div>
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Cookie list */}
           <div className="flex-1 overflow-y-auto">
             {filtered.map(cookie => (
               <button
@@ -63,7 +65,6 @@ export function CookieInspector() {
             ))}
           </div>
 
-          {/* Detail drawer */}
           {selected && (
             <div className="border-t border-gray-700 bg-gray-900 p-3 shrink-0 max-h-48 overflow-y-auto">
               <div className="text-xs font-medium text-gray-300 mb-2">{selected.name}</div>

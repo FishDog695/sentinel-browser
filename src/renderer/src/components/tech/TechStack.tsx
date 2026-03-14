@@ -22,7 +22,8 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function TechStack() {
-  const tech = useSiteStore(s => s.techStack)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const tech = useSiteStore(s => s.tabs[activeTabId]?.techStack ?? [])
 
   if (tech.length === 0) {
     return (
@@ -32,7 +33,6 @@ export function TechStack() {
     )
   }
 
-  // Group by category
   const byCategory = tech.reduce((acc, t) => {
     if (!acc[t.category]) acc[t.category] = []
     acc[t.category].push(t)

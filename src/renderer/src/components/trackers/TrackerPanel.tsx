@@ -1,5 +1,9 @@
 import { useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
+import type { TrackerDetection, FingerprintEvent } from '../../../../../shared/ipcEvents'
+
+const EMPTY_TRACKERS = new Map<string, TrackerDetection>()
+const EMPTY_FP: FingerprintEvent[] = []
 
 const CATEGORY_COLORS: Record<string, string> = {
   Advertising: 'text-red-400',
@@ -18,20 +22,18 @@ const FP_LABELS: Record<string, string> = {
 }
 
 export function TrackerPanel() {
-  const trackersMap = useSiteStore(s => s.trackers)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const trackersMap = useSiteStore(s => s.tabs[activeTabId]?.trackers ?? EMPTY_TRACKERS)
   const trackers = useMemo(() => Array.from(trackersMap.values()), [trackersMap])
-  const fps = useSiteStore(s => s.fingerprintAttempts)
+  const fps = useSiteStore(s => s.tabs[activeTabId]?.fingerprintAttempts ?? EMPTY_FP)
 
-  // Group trackers by category
   const byCategory = trackers.reduce((acc, t) => {
     if (!acc[t.category]) acc[t.category] = []
     acc[t.category].push(t)
     return acc
   }, {} as Record<string, typeof trackers>)
 
-  // Deduplicate fingerprint types
   const fpTypes = [...new Set(fps.map(f => f.type))]
-
   const empty = trackers.length === 0 && fps.length === 0
 
   return (
@@ -42,7 +44,6 @@ export function TrackerPanel() {
         </div>
       )}
 
-      {/* Fingerprinting section */}
       {fpTypes.length > 0 && (
         <section>
           <h3 className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">
@@ -62,7 +63,6 @@ export function TrackerPanel() {
         </section>
       )}
 
-      {/* Tracker categories */}
       {Object.entries(byCategory).map(([category, items]) => (
         <section key={category}>
           <h3 className={['text-xs font-semibold uppercase tracking-wide mb-2', CATEGORY_COLORS[category] ?? 'text-gray-400'].join(' ')}>
