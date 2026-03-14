@@ -1,26 +1,21 @@
 import { useIpcEvents } from './hooks/useIpcEvents'
 import { BrowserChrome } from './components/layout/BrowserChrome'
 import { SidePanel } from './components/layout/SidePanel'
+import { TabBar } from './components/layout/TabBar'
 import { useSiteStore } from './store/siteStore'
 
 export default function App() {
   useIpcEvents()
   const isPanelCollapsed = useSiteStore(s => s.isPanelCollapsed)
   const panelWidth = useSiteStore(s => s.panelWidth)
-
   const effectivePanelWidth = isPanelCollapsed ? 48 : panelWidth
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 select-none overflow-hidden">
-      {/* Custom title bar drag region */}
-      <div
-        className="h-8 bg-gray-950 flex items-center px-4 shrink-0"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
-        <span className="text-xs text-gray-600 font-medium ml-16">Sentinel</span>
-      </div>
+      {/* Tab bar (40px) — includes drag region + window controls */}
+      <TabBar />
 
-      {/* Browser chrome (address bar) */}
+      {/* Browser chrome — address bar (44px) */}
       <BrowserChrome />
 
       {/* Main area: WebContentsView placeholder + side panel */}
@@ -45,15 +40,16 @@ export default function App() {
 }
 
 function StatusBar() {
-  const loading = useSiteStore(s => s.nav.loading)
-  const trackerCount = useSiteStore(s => s.trackers.size)
-  const requestCount = useSiteStore(s => s.networkRequests.length)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const loading = useSiteStore(s => s.tabs[activeTabId]?.nav.loading ?? false)
+  const trackerCount = useSiteStore(s => s.tabs[activeTabId]?.trackers.size ?? 0)
+  const requestCount = useSiteStore(s => s.tabs[activeTabId]?.networkRequests.length ?? 0)
 
   return (
     <div className="h-5 bg-gray-950 border-t border-gray-800 flex items-center px-3 gap-4 text-xs text-gray-500 shrink-0">
       {loading && (
         <span className="flex items-center gap-1">
-          <span className="animate-spin">⟳</span> Loading...
+          <span className="animate-spin inline-block">↻</span> Loading…
         </span>
       )}
       {trackerCount > 0 && (

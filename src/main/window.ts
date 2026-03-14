@@ -1,12 +1,13 @@
-import { app, BrowserWindow, WebContentsView, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { IPC } from '../shared/ipcEvents'
+import { resizeActiveTab } from './tabManager'
 
-const TITLE_BAR_HEIGHT = 32
-const CHROME_HEIGHT = 48
+export const TITLE_BAR_HEIGHT = 40
+export const CHROME_HEIGHT = 44
 const STATUS_BAR_HEIGHT = 20
 const DEFAULT_PANEL_WIDTH = 360
-const MIN_PANEL_WIDTH = 48  // icon-only collapsed state
 
 export interface WindowDimensions {
   width: number
@@ -14,7 +15,7 @@ export interface WindowDimensions {
   panelWidth: number
 }
 
-export function calculateWebViewBounds(dims: WindowDimensions) {
+export function calculateWebViewBounds(dims: WindowDimensions): Electron.Rectangle {
   const topOffset = TITLE_BAR_HEIGHT + CHROME_HEIGHT
   const bottomOffset = STATUS_BAR_HEIGHT
   return {
@@ -44,26 +45,19 @@ export function createMainWindow() {
     },
   })
 
-  const wcv = new WebContentsView({
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      webSecurity: true,
-    },
-  })
-
-  win.contentView.addChildView(wcv)
-
   let panelWidth = DEFAULT_PANEL_WIDTH
 
   function updateWebViewBounds() {
     const [w, h] = win.getContentSize()
     const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth })
-    wcv.setBounds(bounds)
+    resizeActiveTab(bounds)
   }
 
   win.on('resize', updateWebViewBounds)
+
+  // Forward maximize/restore state to renderer for window control buttons
+  win.on('maximize', () => win.webContents.send(IPC.WIN_MAXIMIZED, true))
+  win.on('unmaximize', () => win.webContents.send(IPC.WIN_MAXIMIZED, false))
 
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('panel:initial-width', DEFAULT_PANEL_WIDTH)
@@ -87,5 +81,10 @@ export function createMainWindow() {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  return { win, wcv, updateWebViewBounds, getPanelWidth: () => panelWidth, setPanelWidth: (w: number) => { panelWidth = w; updateWebViewBounds() } }
+  return {
+    win,
+    updateWebViewBounds,
+    getPanelWidth: () => panelWidth,
+    setPanelWidth: (w: number) => { panelWidth = w; updateWebViewBounds() },
+  }
 }

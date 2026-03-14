@@ -1,8 +1,7 @@
 // IPC channel constants and payload types shared between main and renderer.
-// Author this first — it is the contract all other code depends on.
 
 export const IPC = {
-  // Navigation — Main → Renderer
+  // Navigation — Main → Renderer (all include tabId)
   NAV_URL_CHANGED:     'nav:url-changed',
   NAV_TITLE_CHANGED:   'nav:title-changed',
   NAV_HISTORY_CHANGED: 'nav:history-changed',
@@ -32,6 +31,14 @@ export const IPC = {
   AI_STREAM_DONE:  'ai:stream-done',
   AI_STREAM_ERROR: 'ai:stream-error',
 
+  // Tabs — Main → Renderer (push)
+  TAB_CREATED: 'tab:created',
+  TAB_CLOSED:  'tab:closed',
+  TAB_UPDATED: 'tab:updated',
+
+  // Window state — Main → Renderer (push)
+  WIN_MAXIMIZED: 'win:maximized',
+
   // Renderer → Main (invoke)
   NAVIGATE_TO:      'nav:navigate-to',
   NAVIGATE_BACK:    'nav:back',
@@ -42,20 +49,31 @@ export const IPC = {
   AI_CANCEL:        'ai:cancel',
   GET_API_KEY:      'settings:get-api-key',
   SET_API_KEY:      'settings:set-api-key',
+
+  // Tabs — Renderer → Main (invoke)
+  TAB_CREATE: 'tab:create',
+  TAB_CLOSE:  'tab:close',
+  TAB_SWITCH: 'tab:switch',
+
+  // Window controls — Renderer → Main (invoke)
+  WIN_MINIMIZE:     'win:minimize',
+  WIN_MAXIMIZE:     'win:maximize',
+  WIN_CLOSE:        'win:close',
+  WIN_IS_MAXIMIZED: 'win:is-maximized',
 } as const
 
 export type IpcChannel = typeof IPC[keyof typeof IPC]
 
 // ─── Payload types ───────────────────────────────────────────────────────────
 
-export interface NavUrlChanged { url: string }
-export interface NavTitleChanged { title: string }
-export interface NavHistoryChanged { canGoBack: boolean; canGoForward: boolean }
-export interface NavPageLoaded { url: string }
-export interface NavFavicon { url: string }
+export interface NavUrlChanged     { tabId: string; url: string }
+export interface NavTitleChanged   { tabId: string; title: string }
+export interface NavHistoryChanged { tabId: string; canGoBack: boolean; canGoForward: boolean }
+export interface NavPageLoading    { tabId: string; url: string }
+export interface NavFavicon        { tabId: string; url: string }
 
 export interface CookieEvent {
-  id: string            // `${name}@${domain}`
+  id: string
   name: string
   value: string
   domain: string
@@ -66,7 +84,7 @@ export interface CookieEvent {
   expirationDate?: number
   firstParty: boolean
   session: boolean
-  size: number          // byte estimate
+  size: number
 }
 
 export interface NetworkRequest {
@@ -86,7 +104,7 @@ export interface NetworkResponse {
   statusCode: number
   headers: Record<string, string>
   size?: number
-  timing: number        // ms from request start
+  timing: number
 }
 
 export interface TrackerDetection {
@@ -125,3 +143,10 @@ export interface AIAnalysisRequest {
 
 export interface AIStreamChunk { text: string }
 export interface AIStreamError { message: string }
+
+export interface TabInfo {
+  tabId: string
+  title: string
+  url: string
+  favicon: string
+}

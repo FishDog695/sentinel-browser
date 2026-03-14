@@ -1,9 +1,12 @@
 import { useState, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSiteStore } from '../../store/siteStore'
-import type { NetworkRequest } from '../../../../../shared/ipcEvents'
+import type { NetworkRequest, NetworkResponse } from '../../../../../shared/ipcEvents'
 
 type Filter = 'all' | 'third' | 'xhr' | 'script' | 'image'
+
+const EMPTY_REQUESTS: NetworkRequest[] = []
+const EMPTY_RESPONSES = new Map<string, NetworkResponse>()
 
 const RESOURCE_COLORS: Record<string, string> = {
   xhr: 'text-blue-400',
@@ -17,8 +20,9 @@ const RESOURCE_COLORS: Record<string, string> = {
 }
 
 export function NetworkMonitor() {
-  const requests = useSiteStore(s => s.networkRequests)
-  const responses = useSiteStore(s => s.networkResponses)
+  const activeTabId = useSiteStore(s => s.activeTabId)
+  const requests = useSiteStore(s => s.tabs[activeTabId]?.networkRequests ?? EMPTY_REQUESTS)
+  const responses = useSiteStore(s => s.tabs[activeTabId]?.networkResponses ?? EMPTY_RESPONSES)
   const [filter, setFilter] = useState<Filter>('all')
   const [selected, setSelected] = useState<NetworkRequest | null>(null)
   const parentRef = useRef<HTMLDivElement>(null)
@@ -42,7 +46,6 @@ export function NetworkMonitor() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Filter bar */}
       <div className="flex gap-1 p-2 border-b border-gray-800 shrink-0 overflow-x-auto">
         {(['all', 'third', 'xhr', 'script', 'image'] as Filter[]).map(f => (
           <button
@@ -92,7 +95,6 @@ export function NetworkMonitor() {
             </div>
           </div>
 
-          {/* Request detail */}
           {selected && (
             <div className="border-t border-gray-700 bg-gray-900 p-3 shrink-0 max-h-48 overflow-y-auto text-xs space-y-1">
               <div className="font-medium text-gray-300 break-all font-mono">{selected.url}</div>
