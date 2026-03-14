@@ -30,13 +30,112 @@ Structure your response with these sections:
 2. **What this site collects**
 3. **Who it shares data with**
 4. **Technologies powering this site**
-5. **Privacy risk level**: Low / Medium / High — one sentence justification`
+5. **Geographic & Jurisdiction Risk** — identify any third-party domains, trackers, or services linked to entities operating under Chinese, Russian, Iranian, North Korean, Belarusian, Syrian, or other high-risk government jurisdictions. Name the specific companies/domains and their country. Also use your own knowledge to flag any tracker or company names that are associated with high-risk jurisdictions even if not in the domain list. If none detected, state "No high-risk jurisdiction connections detected."
+6. **Privacy risk level**: Low / Medium / High — one sentence justification`
+
+// Known high-risk company base domains → jurisdiction label
+const HIGH_RISK_DOMAINS: Record<string, string> = {
+  // China
+  'baidu.com': 'China (Baidu)',
+  'bdstatic.com': 'China (Baidu)',
+  'bcebos.com': 'China (Baidu Cloud)',
+  'baidustatic.com': 'China (Baidu)',
+  'alibaba.com': 'China (Alibaba)',
+  'aliyun.com': 'China (Alibaba Cloud)',
+  'alicdn.com': 'China (Alibaba CDN)',
+  'alipay.com': 'China (Alipay/Ant Group)',
+  'taobao.com': 'China (Alibaba/Taobao)',
+  'tmall.com': 'China (Alibaba/Tmall)',
+  'tencent.com': 'China (Tencent)',
+  'tencentcloud.com': 'China (Tencent Cloud)',
+  'qq.com': 'China (Tencent/QQ)',
+  'wechat.com': 'China (Tencent/WeChat)',
+  'qpic.cn': 'China (Tencent)',
+  'bytedance.com': 'China (ByteDance)',
+  'tiktok.com': 'China (ByteDance/TikTok)',
+  'tiktokv.com': 'China (ByteDance/TikTok)',
+  'musical.ly': 'China (ByteDance)',
+  'ibytedtos.com': 'China (ByteDance)',
+  'weibo.com': 'China (Sina Weibo)',
+  'sina.com': 'China (Sina)',
+  'sinaimg.cn': 'China (Sina)',
+  'huawei.com': 'China (Huawei)',
+  'hicloud.com': 'China (Huawei Cloud)',
+  'jd.com': 'China (JD.com)',
+  'pinduoduo.com': 'China (PDD Holdings)',
+  'xiaomi.com': 'China (Xiaomi)',
+  'miui.com': 'China (Xiaomi)',
+  'clouddn.com': 'China (Qiniu Cloud)',
+  'qbox.me': 'China (Qiniu Cloud)',
+  // Russia
+  'yandex.ru': 'Russia (Yandex)',
+  'yandex.net': 'Russia (Yandex)',
+  'yandex.com': 'Russia (Yandex)',
+  'yandex.st': 'Russia (Yandex static)',
+  'mail.ru': 'Russia (Mail.ru/VK Group)',
+  'vk.com': 'Russia (VK)',
+  'vk.me': 'Russia (VK)',
+  'userapi.com': 'Russia (VK)',
+  'ok.ru': 'Russia (Odnoklassniki/VK Group)',
+  'mycdn.me': 'Russia (VK Group CDN)',
+  'kaspersky.com': 'Russia (Kaspersky Lab)',
+  'drweb.com': 'Russia (Dr.Web)',
+  'rambler.ru': 'Russia (Rambler)',
+  // Iran
+  'aparat.com': 'Iran (Aparat)',
+  // North Korea — most NK traffic routes through China
+}
+
+// High-risk country-code TLDs
+const HIGH_RISK_CCTLDS: Record<string, string> = {
+  cn: 'China', ru: 'Russia', ir: 'Iran', kp: 'North Korea',
+  by: 'Belarus', sy: 'Syria', cu: 'Cuba', ve: 'Venezuela',
+  sd: 'Sudan', ly: 'Libya',
+}
+
+function buildGeoSection(thirdPartyDomains: string[], trackerDomains: string[]): string {
+  const allDomains = [...new Set([...thirdPartyDomains, ...trackerDomains])]
+  const hits = new Map<string, string[]>() // label → [matched domains]
+
+  for (const hostname of allDomains) {
+    // Check known company map (match on base domain suffix)
+    for (const [baseDomain, label] of Object.entries(HIGH_RISK_DOMAINS)) {
+      if (hostname === baseDomain || hostname.endsWith('.' + baseDomain)) {
+        const existing = hits.get(label) ?? []
+        if (!existing.includes(hostname)) hits.set(label, [...existing, hostname])
+        break
+      }
+    }
+
+    // Check ccTLD
+    const parts = hostname.split('.')
+    const tld = parts[parts.length - 1].toLowerCase()
+    const country = HIGH_RISK_CCTLDS[tld]
+    if (country) {
+      const label = country + ' (ccTLD .' + tld + ')'
+      const existing = hits.get(label) ?? []
+      if (!existing.includes(hostname)) hits.set(label, [...existing, hostname])
+    }
+  }
+
+  if (hits.size === 0) {
+    return 'GEOGRAPHIC CONNECTIONS: None detected via domain analysis — use your knowledge to assess any tracker or company names above.'
+  }
+
+  const lines = ['GEOGRAPHIC CONNECTIONS (detected via domain analysis):']
+  for (const [label, domains] of hits) {
+    lines.push('- ' + label + ': ' + domains.join(', '))
+  }
+  return lines.join('\n')
+}
 
 function buildUserPrompt(req: AIAnalysisRequest): string {
   const trackerList = req.trackers.map(t => t.name + ' (' + t.category + ')').slice(0, 20).join(', ')
   const techList = req.techStack.map(t => t.name + (t.version ? ' ' + t.version : '') + ' [' + t.category + ']').join(', ')
   const fpList = [...new Set(req.fingerprintAttempts.map(f => f.type))].join(', ')
   const thirdParty = req.thirdPartyDomains.slice(0, 30).join(', ')
+  const trackerDomains = req.trackers.map(t => t.domain)
+  const geoSection = buildGeoSection(req.thirdPartyDomains, trackerDomains)
 
   return [
     'Analyze this website for privacy and security transparency.',
@@ -59,6 +158,8 @@ function buildUserPrompt(req: AIAnalysisRequest): string {
     'FINGERPRINTING ATTEMPTS: ' + (fpList || 'None'),
     '',
     'TECHNOLOGY STACK: ' + (techList || 'Unknown'),
+    '',
+    geoSection,
   ].join('\n')
 }
 
@@ -120,7 +221,7 @@ export function registerIpcHandlers(
     try {
       const stream = await client.messages.stream({
         model: 'claude-opus-4-6',
-        max_tokens: 1024,
+        max_tokens: 1500,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserPrompt(req) }],
       })

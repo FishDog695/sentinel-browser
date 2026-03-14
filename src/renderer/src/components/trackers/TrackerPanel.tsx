@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -17,7 +18,8 @@ const FP_LABELS: Record<string, string> = {
 }
 
 export function TrackerPanel() {
-  const trackers = useSiteStore(s => Array.from(s.trackers.values()))
+  const trackersMap = useSiteStore(s => s.trackers)
+  const trackers = useMemo(() => Array.from(trackersMap.values()), [trackersMap])
   const fps = useSiteStore(s => s.fingerprintAttempts)
 
   // Group trackers by category

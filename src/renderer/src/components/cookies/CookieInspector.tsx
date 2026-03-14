@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 import type { CookieEvent } from '../../../../../shared/ipcEvents'
 
 export function CookieInspector() {
-  const cookies = useSiteStore(s => Array.from(s.cookies.values()))
+  const cookiesMap = useSiteStore(s => s.cookies)
+  const cookies = useMemo(() => Array.from(cookiesMap.values()), [cookiesMap])
   const [filter, setFilter] = useState<'all' | 'first' | 'third'>('all')
   const [selected, setSelected] = useState<CookieEvent | null>(null)
 

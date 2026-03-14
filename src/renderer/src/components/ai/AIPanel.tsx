@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 import { ipc } from '../../lib/ipc'
 import type { AIAnalysisRequest } from '../../../../../shared/ipcEvents'
 
 export function AIPanel() {
   const nav = useSiteStore(s => s.nav)
-  const cookies = useSiteStore(s => Array.from(s.cookies.values()))
+  const cookiesMap = useSiteStore(s => s.cookies)
+  const cookies = useMemo(() => Array.from(cookiesMap.values()), [cookiesMap])
   const requests = useSiteStore(s => s.networkRequests)
-  const trackers = useSiteStore(s => Array.from(s.trackers.values()))
+  const trackersMap = useSiteStore(s => s.trackers)
+  const trackers = useMemo(() => Array.from(trackersMap.values()), [trackersMap])
   const fps = useSiteStore(s => s.fingerprintAttempts)
   const tech = useSiteStore(s => s.techStack)
   const aiAnalysis = useSiteStore(s => s.aiAnalysis)
