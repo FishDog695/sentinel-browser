@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipcEvents'
-import type { AIAnalysisRequest } from '../shared/ipcEvents'
+import type { AIAnalysisRequest, Favorite, HistoryEntry } from '../shared/ipcEvents'
 
 // Expose safe API surface to renderer — this is the ONLY way renderer accesses Electron
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -23,6 +23,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createTab: () => ipcRenderer.invoke(IPC.TAB_CREATE),
   closeTab: (tabId: string) => ipcRenderer.invoke(IPC.TAB_CLOSE, tabId),
   switchTab: (tabId: string) => ipcRenderer.invoke(IPC.TAB_SWITCH, tabId),
+
+  // Favorites
+  getFavorites: (): Promise<Favorite[]> => ipcRenderer.invoke(IPC.FAV_GET),
+  addFavorite: (fav: Favorite): Promise<Favorite[]> => ipcRenderer.invoke(IPC.FAV_ADD, fav),
+  removeFavorite: (url: string): Promise<Favorite[]> => ipcRenderer.invoke(IPC.FAV_REMOVE, url),
+
+  // History
+  getHistory: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC.HISTORY_GET),
+  clearHistory: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC.HISTORY_CLEAR),
+
+  // Toolbar overlay — shifts WebContentsView down so dropdowns aren't hidden behind it
+  setToolbarOverlay: (height: number) => ipcRenderer.invoke(IPC.TOOLBAR_OVERLAY, height),
 
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),

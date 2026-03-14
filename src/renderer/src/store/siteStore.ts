@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type {
   CookieEvent, NetworkRequest, NetworkResponse,
-  TrackerDetection, FingerprintEvent, TechDetection
+  TrackerDetection, FingerprintEvent, TechDetection, Favorite, HistoryEntry
 } from '../../../shared/ipcEvents'
+
+export type { Favorite, HistoryEntry }
 
 export type PanelTab = 'cookies' | 'network' | 'trackers' | 'tech' | 'ai'
 
@@ -54,6 +56,14 @@ interface SiteStore {
   tabs: Record<string, TabState>
   activeTabId: string
   tabOrder: string[]
+
+  // Favorites (global, persisted via electron-store)
+  favorites: Favorite[]
+  setFavorites: (favs: Favorite[]) => void
+
+  // History (global, persisted via electron-store)
+  history: HistoryEntry[]
+  setHistory: (entries: HistoryEntry[]) => void
 
   // Global UI state
   activePanel: PanelTab
@@ -112,6 +122,12 @@ export const useSiteStore = create<SiteStore>((set) => ({
   tabs: {},
   activeTabId: '',
   tabOrder: [],
+
+  favorites: [],
+  setFavorites: (favs) => set({ favorites: favs }),
+
+  history: [],
+  setHistory: (entries) => set({ history: entries }),
 
   activePanel: 'cookies',
   panelWidth: 360,

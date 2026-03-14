@@ -1,17 +1,22 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, protocol, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { createMainWindow, calculateWebViewBounds } from './window'
 import { setupSessionHooks, setTabUrl, getScriptUrls } from './session'
 import { loadTrackerList } from './trackerEngine'
 import { getSnapshotForUrl } from './cookies'
-import { registerIpcHandlers } from './ipcHandlers'
+import { registerIpcHandlers, recordHistory } from './ipcHandlers'
 import { detectFromHtml, detectFromGlobals, mergeDetections } from './techDetector'
 import {
   createTab, showTab, getWcvByTabId,
   updateTabMeta, getTabMeta
 } from './tabManager'
 import { IPC } from '../shared/ipcEvents'
+
+// Register sentinel:// as a privileged scheme (must be called before app.whenReady)
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'sentinel', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+])
 
 // Fingerprint observer injected into every page
 const FINGERPRINT_SCRIPT = `(function() {
@@ -94,7 +99,10 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
     updateTabMeta(tabId, { title })
     win.webContents.send(IPC.NAV_TITLE_CHANGED, { tabId, title })
     const m = getTabMeta(tabId)
-    if (m) win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+    if (m) {
+      win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+      recordHistory({ url: m.url, title, favicon: m.favicon, visitedAt: Date.now() })
+    }
   })
 
   wcv.webContents.on('did-finish-load', async () => {
@@ -125,7 +133,10 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
       updateTabMeta(tabId, { favicon: favicons[0] })
       win.webContents.send(IPC.NAV_FAVICON, { tabId, url: favicons[0] })
       const m = getTabMeta(tabId)
-      if (m) win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+      if (m) {
+        win.webContents.send(IPC.TAB_UPDATED, { id: m.id, url: m.url, title: m.title, favicon: m.favicon })
+        recordHistory({ url: m.url, title: m.title, favicon: favicons[0], visitedAt: Date.now() })
+      }
     }
   })
 }
@@ -137,11 +148,23 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Serve resources/newtab.html at sentinel://newtab
+  protocol.handle('sentinel', (request) => {
+    const resourcesPath = app.isPackaged
+      ? process.resourcesPath
+      : join(__dirname, '../../resources')
+    if (new URL(request.url).hostname === 'newtab') {
+      const filePath = join(resourcesPath, 'newtab.html').replace(/\\/g, '/')
+      return net.fetch('file://' + filePath)
+    }
+    return new Response('Not found', { status: 404 })
+  })
+
   // Load tracker database
   const resourcesPath = app.isPackaged ? process.resourcesPath : join(__dirname, '../../resources')
   loadTrackerList(resourcesPath)
 
-  const { win, updateWebViewBounds, getPanelWidth, setPanelWidth } = createMainWindow()
+  const { win, updateWebViewBounds, getPanelWidth, setPanelWidth, setOverlayHeight } = createMainWindow()
 
   // Create the initial tab
   const { tabId, wcv } = createTab(win)
@@ -153,7 +176,7 @@ app.whenReady().then(async () => {
   setupTabEvents(win, tabId)
 
   // Register all IPC handlers, passing setupTabEvents so TAB_CREATE can wire new tabs
-  registerIpcHandlers(win, setupTabEvents, calculateWebViewBounds, getPanelWidth, setPanelWidth, updateWebViewBounds)
+  registerIpcHandlers(win, setupTabEvents, calculateWebViewBounds, getPanelWidth, setPanelWidth, updateWebViewBounds, setOverlayHeight)
 
   // Show the initial tab with correct bounds
   const [w, h] = win.getContentSize()
@@ -175,7 +198,7 @@ app.whenReady().then(async () => {
   })
 
   // Load initial page
-  await wcv.webContents.loadURL('https://example.com')
+  await wcv.webContents.loadURL('sentinel://newtab')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

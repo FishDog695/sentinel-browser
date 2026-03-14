@@ -60,6 +60,18 @@ export const IPC = {
   WIN_MAXIMIZE:     'win:maximize',
   WIN_CLOSE:        'win:close',
   WIN_IS_MAXIMIZED: 'win:is-maximized',
+
+  // Favorites — Renderer → Main (invoke, each returns updated Favorite[])
+  FAV_GET:    'fav:get',
+  FAV_ADD:    'fav:add',
+  FAV_REMOVE: 'fav:remove',
+
+  // History — Renderer → Main (invoke)
+  HISTORY_GET:   'history:get',
+  HISTORY_CLEAR: 'history:clear',
+
+  // Toolbar overlay — Renderer → Main (invoke): temporarily shifts WebContentsView down
+  TOOLBAR_OVERLAY: 'toolbar:overlay',
 } as const
 
 export type IpcChannel = typeof IPC[keyof typeof IPC]
@@ -143,6 +155,20 @@ export interface AIAnalysisRequest {
 
 export interface AIStreamChunk { text: string }
 export interface AIStreamError { message: string }
+
+export interface Favorite {
+  url: string
+  title: string
+  favicon?: string
+  addedAt: number
+}
+
+export interface HistoryEntry {
+  url: string
+  title: string
+  favicon?: string
+  visitedAt: number
+}
 
 export interface TabInfo {
   tabId: string

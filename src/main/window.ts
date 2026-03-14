@@ -13,10 +13,11 @@ export interface WindowDimensions {
   width: number
   height: number
   panelWidth: number
+  overlayHeight?: number
 }
 
 export function calculateWebViewBounds(dims: WindowDimensions): Electron.Rectangle {
-  const topOffset = TITLE_BAR_HEIGHT + CHROME_HEIGHT
+  const topOffset = TITLE_BAR_HEIGHT + CHROME_HEIGHT + (dims.overlayHeight ?? 0)
   const bottomOffset = STATUS_BAR_HEIGHT
   return {
     x: 0,
@@ -46,10 +47,11 @@ export function createMainWindow() {
   })
 
   let panelWidth = DEFAULT_PANEL_WIDTH
+  let overlayHeight = 0
 
   function updateWebViewBounds() {
     const [w, h] = win.getContentSize()
-    const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth })
+    const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth, overlayHeight })
     resizeActiveTab(bounds)
   }
 
@@ -86,5 +88,6 @@ export function createMainWindow() {
     updateWebViewBounds,
     getPanelWidth: () => panelWidth,
     setPanelWidth: (w: number) => { panelWidth = w; updateWebViewBounds() },
+    setOverlayHeight: (h: number) => { overlayHeight = h; updateWebViewBounds() },
   }
 }

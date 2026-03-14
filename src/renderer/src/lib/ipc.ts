@@ -1,6 +1,8 @@
 // Typed wrappers around window.electronAPI
 // The renderer never imports from 'electron' directly
 
+import type { Favorite, HistoryEntry } from '../../../shared/ipcEvents'
+
 declare global {
   interface Window {
     electronAPI: {
@@ -13,6 +15,12 @@ declare global {
       cancelAnalysis: () => Promise<void>
       getApiKey: () => Promise<boolean>
       setApiKey: (key: string) => Promise<void>
+      getFavorites: () => Promise<Favorite[]>
+      addFavorite: (fav: Favorite) => Promise<Favorite[]>
+      removeFavorite: (url: string) => Promise<Favorite[]>
+      getHistory: () => Promise<HistoryEntry[]>
+      clearHistory: () => Promise<HistoryEntry[]>
+      setToolbarOverlay: (height: number) => Promise<void>
       createTab: () => Promise<string>
       closeTab: (tabId: string) => Promise<void>
       switchTab: (tabId: string) => Promise<void>
@@ -37,6 +45,12 @@ export const ipc = {
   cancelAnalysis: () => window.electronAPI.cancelAnalysis(),
   getApiKey: () => window.electronAPI.getApiKey(),
   setApiKey: (key: string) => window.electronAPI.setApiKey(key),
+  getFavorites: () => window.electronAPI.getFavorites(),
+  addFavorite: (fav: Favorite) => window.electronAPI.addFavorite(fav),
+  removeFavorite: (url: string) => window.electronAPI.removeFavorite(url),
+  getHistory: () => window.electronAPI.getHistory(),
+  clearHistory: () => window.electronAPI.clearHistory(),
+  setToolbarOverlay: (height: number) => window.electronAPI.setToolbarOverlay(height),
   createTab: () => window.electronAPI.createTab(),
   closeTab: (tabId: string) => window.electronAPI.closeTab(tabId),
   switchTab: (tabId: string) => window.electronAPI.switchTab(tabId),

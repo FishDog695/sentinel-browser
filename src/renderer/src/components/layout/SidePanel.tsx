@@ -5,15 +5,21 @@ import { NetworkMonitor } from '../network/NetworkMonitor'
 import { TrackerPanel } from '../trackers/TrackerPanel'
 import { TechStack } from '../tech/TechStack'
 import { AIPanel } from '../ai/AIPanel'
-
 interface Tab { id: PanelTab; label: string; icon: string; getCount?: () => number }
 
 export function SidePanel() {
   const activePanel = useSiteStore(s => s.activePanel)
   const isPanelCollapsed = useSiteStore(s => s.isPanelCollapsed)
+  const panelWidth = useSiteStore(s => s.panelWidth)
   const setActivePanel = useSiteStore(s => s.setActivePanel)
   const togglePanel = useSiteStore(s => s.togglePanel)
   const activeTabId = useSiteStore(s => s.activeTabId)
+
+  // Collapsed icon strip is 48px; expanded uses the stored panelWidth.
+  // Always sync the effective width to the main process so WebContentsView resizes.
+  const COLLAPSED_W = 48
+  function collapse() { togglePanel(); ipc.setPanelWidth(COLLAPSED_W) }
+  function expand()   { togglePanel(); ipc.setPanelWidth(panelWidth) }
   const cookieCount = useSiteStore(s => s.tabs[activeTabId]?.cookies.size ?? 0)
   const requestCount = useSiteStore(s => s.tabs[activeTabId]?.networkRequests.length ?? 0)
   const trackerCount = useSiteStore(s => s.tabs[activeTabId]?.trackers.size ?? 0)
@@ -31,7 +37,7 @@ export function SidePanel() {
     return (
       <div className="flex flex-col items-center py-2 gap-1 w-full">
         <button
-          onClick={() => { togglePanel(); ipc.setPanelWidth(360) }}
+          onClick={expand}
           className="w-10 h-8 flex items-center justify-center rounded hover:bg-gray-800 text-gray-400 text-sm"
           title="Expand panel"
         >
@@ -42,7 +48,7 @@ export function SidePanel() {
           return (
             <button
               key={tab.id}
-              onClick={() => { setActivePanel(tab.id); togglePanel() }}
+              onClick={() => { setActivePanel(tab.id); expand() }}
               className="w-10 h-10 flex flex-col items-center justify-center rounded hover:bg-gray-800 text-gray-400 relative"
               title={tab.label}
             >
@@ -64,7 +70,7 @@ export function SidePanel() {
       {/* Tab bar */}
       <div className="flex items-center border-b border-gray-800 bg-gray-950 overflow-x-auto shrink-0">
         <button
-          onClick={togglePanel}
+          onClick={collapse}
           className="px-2 py-2 text-gray-500 hover:text-gray-300 shrink-0"
           title="Collapse panel"
         >

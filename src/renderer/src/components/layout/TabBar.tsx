@@ -61,8 +61,8 @@ export function TabBar() {
                 'flex items-center gap-1.5 px-3 min-w-[80px] max-w-[160px] border-r border-gray-800/50',
                 'text-xs truncate transition-colors group relative shrink-0',
                 isActive
-                  ? 'bg-gray-900 text-gray-100 border-t-2 border-t-blue-500'
-                  : 'bg-transparent text-gray-500 hover:bg-gray-900/50 hover:text-gray-300 border-t-2 border-t-transparent',
+                  ? 'bg-[#e2e4e6] text-gray-900 border-t-2 border-t-blue-500'
+                  : 'bg-transparent text-gray-500 hover:bg-gray-800/60 hover:text-gray-300 border-t-2 border-t-transparent',
               ].join(' ')}
               title={title}
             >
@@ -96,7 +96,7 @@ export function TabBar() {
                 className={[
                   'w-4 h-4 flex items-center justify-center rounded shrink-0 transition-opacity',
                   'opacity-0 group-hover:opacity-100 hover:bg-gray-700',
-                  isActive ? 'opacity-50' : '',
+                  isActive ? 'opacity-40' : '',
                 ].join(' ')}
               >
                 <svg viewBox="0 0 10 10" className="w-2 h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none">

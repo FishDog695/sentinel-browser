@@ -1,11 +1,19 @@
+import { useEffect } from 'react'
 import { useIpcEvents } from './hooks/useIpcEvents'
 import { BrowserChrome } from './components/layout/BrowserChrome'
 import { SidePanel } from './components/layout/SidePanel'
 import { TabBar } from './components/layout/TabBar'
 import { useSiteStore } from './store/siteStore'
+import { ipc } from './lib/ipc'
 
 export default function App() {
   useIpcEvents()
+
+  // Load persisted favorites and history from disk on startup
+  useEffect(() => {
+    ipc.getFavorites().then(favs => useSiteStore.getState().setFavorites(favs))
+    ipc.getHistory().then(entries => useSiteStore.getState().setHistory(entries))
+  }, [])
   const isPanelCollapsed = useSiteStore(s => s.isPanelCollapsed)
   const panelWidth = useSiteStore(s => s.panelWidth)
   const effectivePanelWidth = isPanelCollapsed ? 48 : panelWidth

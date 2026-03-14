@@ -1,13 +1,13 @@
 import { ipcMain, BrowserWindow, safeStorage } from 'electron'
 import Anthropic from '@anthropic-ai/sdk'
 import Store from 'electron-store'
-import { IPC, AIAnalysisRequest } from '../shared/ipcEvents'
+import { IPC, AIAnalysisRequest, Favorite, HistoryEntry } from '../shared/ipcEvents'
 import {
   createTab, showTab, closeTab, getActiveWcv, getTabMeta,
 } from './tabManager'
 import { WindowDimensions } from './window'
 
-const store = new Store<{ apiKey: string }>()
+const store = new Store<{ apiKey: string; favorites: Favorite[]; history: HistoryEntry[] }>()
 let anthropic: Anthropic | null = null
 let currentAnalysisController: AbortController | null = null
 
@@ -158,6 +158,30 @@ function buildUserPrompt(req: AIAnalysisRequest): string {
   ].join('\n')
 }
 
+function normalizeInput(input: string): string {
+  const t = input.trim()
+  if (!t) return t
+  if (t.startsWith('http://') || t.startsWith('https://')) return t
+  // Looks like a plain domain: no spaces, has dot + TLD
+  if (!/\s/.test(t) && /^[a-zA-Z0-9]([a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}([/?#].*)?$/.test(t)) {
+    return 'https://' + t
+  }
+  // Treat as Google search query
+  return 'https://www.google.com/search?q=' + encodeURIComponent(t)
+}
+
+export function recordHistory(entry: HistoryEntry): void {
+  if (entry.url.startsWith('sentinel://')) return
+  const all = store.get('history', [])
+  const idx = all.findIndex(h => h.url === entry.url)
+  if (idx !== -1) {
+    all[idx] = { ...all[idx], ...entry }
+  } else {
+    all.unshift(entry)
+  }
+  store.set('history', all.slice(0, 500))
+}
+
 export function registerIpcHandlers(
   win: BrowserWindow,
   // Passed from index.ts so TAB_CREATE can wire events for new tabs without circular deps
@@ -166,13 +190,14 @@ export function registerIpcHandlers(
   getPanelWidth: () => number,
   setPanelWidth: (w: number) => void,
   updateWebViewBounds: () => void,
+  setOverlayHeight: (h: number) => void,
 ) {
   // ─── Navigation ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.NAVIGATE_TO, async (_e, url: string) => {
     const wcv = getActiveWcv()
     if (!wcv) return
-    const normalized = url.startsWith('http') ? url : 'https://' + url
-    await wcv.webContents.loadURL(normalized)
+    // Ignore navigation errors (ERR_ABORTED, redirects, etc.) — they're normal browser events
+    await wcv.webContents.loadURL(normalizeInput(url)).catch(() => {})
   })
   ipcMain.handle(IPC.NAVIGATE_BACK, () => getActiveWcv()?.webContents.navigationHistory.goBack())
   ipcMain.handle(IPC.NAVIGATE_FORWARD, () => getActiveWcv()?.webContents.navigationHistory.goForward())
@@ -183,6 +208,11 @@ export function registerIpcHandlers(
     setPanelWidth(width)
   })
 
+  // ─── Toolbar overlay (dropdown open/close) ───────────────────────────────────
+  ipcMain.handle(IPC.TOOLBAR_OVERLAY, (_e, height: number) => {
+    setOverlayHeight(height)
+  })
+
   // ─── Tabs ────────────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.TAB_CREATE, async () => {
     const { tabId, wcv } = createTab(win)
@@ -190,7 +220,7 @@ export function registerIpcHandlers(
     const [w, h] = win.getContentSize()
     const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
     showTab(tabId, bounds)
-    await wcv.webContents.loadURL('https://example.com')
+    await wcv.webContents.loadURL('sentinel://newtab')
     const meta = getTabMeta(tabId)!
     win.webContents.send(IPC.TAB_CREATED, {
       tabId: meta.id, url: meta.url, title: meta.title, favicon: meta.favicon, isActive: true,
@@ -231,6 +261,30 @@ export function registerIpcHandlers(
     const encrypted = safeStorage.encryptString(apiKey)
     store.set('apiKey', encrypted.toString('base64'))
     anthropic = null
+  })
+
+  // ─── Favorites ───────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.FAV_GET, () => store.get('favorites', []))
+
+  ipcMain.handle(IPC.FAV_ADD, (_e, fav: Favorite) => {
+    const favs = store.get('favorites', [])
+    if (!favs.find(f => f.url === fav.url)) favs.push(fav)
+    store.set('favorites', favs)
+    return favs
+  })
+
+  ipcMain.handle(IPC.FAV_REMOVE, (_e, url: string) => {
+    const favs = store.get('favorites', []).filter(f => f.url !== url)
+    store.set('favorites', favs)
+    return favs
+  })
+
+  // ─── History ─────────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.HISTORY_GET, () => store.get('history', []))
+
+  ipcMain.handle(IPC.HISTORY_CLEAR, () => {
+    store.set('history', [])
+    return []
   })
 
   // ─── AI Analysis ─────────────────────────────────────────────────────────────
