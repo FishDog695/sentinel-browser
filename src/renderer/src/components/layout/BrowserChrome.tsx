@@ -3,10 +3,10 @@ import { useSiteStore } from '../../store/siteStore'
 import { ipc } from '../../lib/ipc'
 import type { Favorite, HistoryEntry } from '../../store/siteStore'
 
-function ShieldIcon({ filled }: { filled: boolean }) {
+function CheckIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="w-4 h-4" fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'} strokeWidth="1.5">
-      <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.563 2 12.162 2 7c0-.539.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.749z" clipRule="evenodd" />
+    <svg viewBox="0 0 16 16" className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="2.5,8 6,11.5 13.5,4" />
     </svg>
   )
 }
@@ -15,29 +15,53 @@ function ModeToggle() {
   const mode = useSiteStore(s => s.mode)
   const [pending, setPending] = useState(false)
 
-  async function toggle() {
+  async function select(next: 'explore' | 'lockdown') {
+    if (next === mode || pending) return
     setPending(true)
-    const next = mode === 'explore' ? 'lockdown' : 'explore'
     await ipc.setMode(next)
     useSiteStore.getState().setMode(next)
     setPending(false)
   }
 
-  const isLocked = mode === 'lockdown'
+  const isLockdown = mode === 'lockdown'
+
   return (
-    <button
-      onClick={toggle}
-      disabled={pending}
-      title={isLocked ? 'Lockdown Mode active — click to switch to Explore Mode' : 'Explore Mode — click to enable Lockdown Mode'}
-      className={[
-        'w-7 h-7 flex items-center justify-center rounded transition-colors shrink-0',
-        isLocked
-          ? 'text-green-400 hover:bg-green-900/30'
-          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200',
-      ].join(' ')}
-    >
-      <ShieldIcon filled={isLocked} />
-    </button>
+    <div className="flex items-center rounded-full border border-gray-600 overflow-hidden text-xs font-medium h-6 shrink-0">
+      {/* Explore segment */}
+      <button
+        onClick={() => select('explore')}
+        disabled={pending}
+        title="Explore Mode — standard browsing"
+        className={[
+          'flex items-center gap-1 px-2.5 h-full transition-colors',
+          !isLockdown
+            ? 'bg-gray-200 text-gray-800'
+            : 'bg-transparent text-gray-500 hover:text-gray-300',
+        ].join(' ')}
+      >
+        {!isLockdown && <CheckIcon />}
+        <span>Explore</span>
+      </button>
+
+      {/* Divider */}
+      <div className="w-px h-full bg-gray-600 shrink-0" />
+
+      {/* Lockdown segment */}
+      <button
+        onClick={() => select('lockdown')}
+        disabled={pending}
+        title="Lockdown Mode — blocks trackers, 3rd-party cookies & fingerprinting"
+        className={[
+          'flex items-center gap-1 px-2.5 h-full transition-colors',
+          isLockdown
+            ? 'bg-green-700/80 text-green-100'
+            : 'bg-transparent text-gray-500 hover:text-gray-300',
+        ].join(' ')}
+      >
+        {isLockdown && <CheckIcon />}
+        <span>Lockdown</span>
+      </button>
+    </div>
   )
 }
 
