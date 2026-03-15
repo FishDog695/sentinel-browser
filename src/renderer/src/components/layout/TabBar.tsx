@@ -43,7 +43,7 @@ export function TabBar() {
     >
       {/* Tab pills */}
       <div
-        className="flex items-stretch overflow-x-auto min-w-0"
+        className="flex items-end overflow-x-auto min-w-0 px-1"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         {tabOrder.map(tabId => {
@@ -58,11 +58,11 @@ export function TabBar() {
               key={tabId}
               onClick={() => handleSwitchTab(tabId)}
               className={[
-                'flex items-center gap-1.5 px-3 min-w-[80px] max-w-[160px] border-r border-gray-800/50',
+                'flex items-center gap-1.5 px-3 min-w-[80px] max-w-[160px] mx-0.5 rounded-t-md',
                 'text-xs truncate transition-colors group relative shrink-0',
                 isActive
-                  ? 'bg-[#e2e4e6] text-gray-900 border-t-2 border-t-blue-500'
-                  : 'bg-transparent text-gray-500 hover:bg-gray-800/60 hover:text-gray-300 border-t-2 border-t-transparent',
+                  ? 'h-9 bg-[#e2e4e6] text-gray-900 border-t-2 border-t-blue-500'
+                  : 'h-7 bg-gray-800/50 text-gray-500 hover:bg-gray-800 hover:text-gray-300 border-t-2 border-t-transparent',
               ].join(' ')}
               title={title}
             >

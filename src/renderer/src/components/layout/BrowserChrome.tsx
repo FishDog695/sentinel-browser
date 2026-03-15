@@ -359,15 +359,15 @@ export function BrowserChrome() {
 
       {/* URL bar with star inside */}
       <form onSubmit={handleNavigate} className="flex-1 max-w-[560px]">
-        <div className="flex items-center bg-gray-800 rounded-md border border-gray-700 focus-within:border-blue-500 px-2 h-8 gap-1.5 transition-colors">
+        <div className="flex items-center bg-white rounded-md border border-gray-300 focus-within:border-blue-500 px-2 h-8 gap-1.5 transition-colors">
           {/* HTTPS badge */}
           {url && (
             <span
               className={[
                 'text-[10px] font-medium px-1 py-0.5 rounded shrink-0',
                 isSecure
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-gray-700 text-gray-500',
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-gray-100 text-gray-500',
               ].join(' ')}
               title={isSecure ? 'Secure connection' : 'Not secure'}
             >
@@ -394,7 +394,7 @@ export function BrowserChrome() {
             }}
             onBlur={() => setIsEditing(false)}
             placeholder="Enter URL or search…"
-            className="flex-1 bg-transparent text-gray-200 text-sm outline-none placeholder:text-gray-500 min-w-0"
+            className="flex-1 bg-transparent text-gray-800 text-sm outline-none placeholder:text-gray-400 min-w-0"
             spellCheck={false}
           />
           {/* Star button inside URL bar */}
@@ -402,7 +402,7 @@ export function BrowserChrome() {
             <button
               type="button"
               onClick={handleToggleFavorite}
-              className="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-gray-600 transition-colors"
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 transition-colors"
               title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
             >
               <StarIcon filled={isFavorited} />
