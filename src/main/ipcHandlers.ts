@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import Store from 'electron-store'
 import { IPC, AIAnalysisRequest, Favorite, HistoryEntry } from '../shared/ipcEvents'
 import {
-  createTab, showTab, closeTab, getActiveWcv, getTabMeta,
+  createTab, showTab, closeTab, getActiveWcv, getTabMeta, getTabOrder, getActiveTabId,
 } from './tabManager'
 import { WindowDimensions } from './window'
 
@@ -253,6 +253,25 @@ export function registerIpcHandlers(
   })
 
   // ─── Tabs ────────────────────────────────────────────────────────────────────
+
+  // Renderer calls this once on startup (after IPC listeners are registered) to
+  // pull current tab state. Avoids the race where the push-based TAB_CREATED fires
+  // before the renderer's useEffect has subscribed to it.
+  ipcMain.handle(IPC.GET_TABS, () => {
+    const order = getTabOrder()
+    const active = getActiveTabId()
+    return order.map(tabId => {
+      const meta = getTabMeta(tabId)
+      return {
+        tabId,
+        url: meta?.url ?? '',
+        title: meta?.title ?? 'New Tab',
+        favicon: meta?.favicon ?? '',
+        isActive: tabId === active,
+      }
+    })
+  })
+
   ipcMain.handle(IPC.TAB_CREATE, async () => {
     const { tabId, wcv } = createTab(win)
     setupTabEvents(win, tabId)

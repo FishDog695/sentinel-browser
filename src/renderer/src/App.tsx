@@ -9,6 +9,21 @@ import { ipc } from './lib/ipc'
 export default function App() {
   useIpcEvents()
 
+  // Pull initial tab state from main process after IPC listeners are registered.
+  // React runs effects in declaration order, so useIpcEvents() above has already
+  // subscribed before this fires — getTabs() recovers any TAB_CREATED events that
+  // arrived before the listeners were ready (common in packaged / slower builds).
+  useEffect(() => {
+    ipc.getTabs().then(tabs => {
+      const store = useSiteStore.getState()
+      for (const t of tabs) {
+        store.createTabState(t.tabId)
+        if (t.url) store.setTabNav(t.tabId, { url: t.url, title: t.title, favicon: t.favicon })
+        if (t.isActive) store.setActiveTabId(t.tabId)
+      }
+    })
+  }, [])
+
   // Load persisted favorites and history from disk on startup
   useEffect(() => {
     ipc.getFavorites().then(favs => useSiteStore.getState().setFavorites(favs))

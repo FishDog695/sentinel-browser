@@ -146,10 +146,15 @@ export const useSiteStore = create<SiteStore>((set) => ({
   isPanelCollapsed: false,
 
   // ─── Tab lifecycle ───────────────────────────────────────────────────────────
-  createTabState: (tabId) => set((s) => ({
-    tabs: { ...s.tabs, [tabId]: createEmptyTabState(tabId) },
-    tabOrder: s.tabOrder.includes(tabId) ? s.tabOrder : [...s.tabOrder, tabId],
-  })),
+  createTabState: (tabId) => set((s) => {
+    // Idempotent: don't overwrite existing tab state (avoids clobbering live data
+    // when both the push TAB_CREATED and the pull getTabs() path fire for the same tab)
+    if (s.tabs[tabId]) return {}
+    return {
+      tabs: { ...s.tabs, [tabId]: createEmptyTabState(tabId) },
+      tabOrder: s.tabOrder.includes(tabId) ? s.tabOrder : [...s.tabOrder, tabId],
+    }
+  }),
 
   closeTabState: (tabId, nextTabId) => set((s) => {
     const { [tabId]: _, ...rest } = s.tabs

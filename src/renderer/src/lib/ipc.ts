@@ -32,6 +32,7 @@ declare global {
       addAiBlocklist: (domains: string[]) => Promise<void>
       getClearOnClose: () => Promise<boolean>
       setClearOnClose: (v: boolean) => Promise<void>
+      getTabs: () => Promise<Array<{ tabId: string; url: string; title: string; favicon: string; isActive: boolean }>>
       createTab: () => Promise<string>
       closeTab: (tabId: string) => Promise<void>
       switchTab: (tabId: string) => Promise<void>
@@ -73,6 +74,7 @@ export const ipc = {
   addAiBlocklist: (domains: string[]) => window.electronAPI.addAiBlocklist(domains),
   getClearOnClose: () => window.electronAPI.getClearOnClose(),
   setClearOnClose: (v: boolean) => window.electronAPI.setClearOnClose(v),
+  getTabs: () => window.electronAPI.getTabs(),
   createTab: () => window.electronAPI.createTab(),
   closeTab: (tabId: string) => window.electronAPI.closeTab(tabId),
   switchTab: (tabId: string) => window.electronAPI.switchTab(tabId),

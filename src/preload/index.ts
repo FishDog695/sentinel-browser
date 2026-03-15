@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getClearOnClose: (): Promise<boolean> => ipcRenderer.invoke(IPC.GET_CLEAR_ON_CLOSE),
   setClearOnClose: (v: boolean) => ipcRenderer.invoke(IPC.SET_CLEAR_ON_CLOSE, v),
 
+  // Pull current tab list on startup (renderer calls this after registering IPC listeners)
+  getTabs: () => ipcRenderer.invoke(IPC.GET_TABS),
+
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),
   maximizeWindow: () => ipcRenderer.invoke(IPC.WIN_MAXIMIZE),

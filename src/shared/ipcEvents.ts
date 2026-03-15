@@ -88,6 +88,9 @@ export const IPC = {
   // Privacy cleanup settings
   GET_CLEAR_ON_CLOSE: 'settings:get-clear-on-close',
   SET_CLEAR_ON_CLOSE: 'settings:set-clear-on-close',
+
+  // Renderer → Main: pull current tab list on startup (avoids push race condition)
+  GET_TABS: 'tabs:get-all',
 } as const
 
 export type IpcChannel = typeof IPC[keyof typeof IPC]
