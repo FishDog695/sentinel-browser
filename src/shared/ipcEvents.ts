@@ -78,6 +78,12 @@ export const IPC = {
 
   // Toolbar overlay — Renderer → Main (invoke): temporarily shifts WebContentsView down
   TOOLBAR_OVERLAY: 'toolbar:overlay',
+
+  // Lockdown mode — bidirectional
+  GET_MODE:        'settings:get-mode',
+  SET_MODE:        'settings:set-mode',
+  MODE_CHANGED:    'settings:mode-changed',   // Main → Renderer push
+  BLOCKED_REQUEST: 'network:blocked',          // Main → Renderer push
 } as const
 
 export type IpcChannel = typeof IPC[keyof typeof IPC]
@@ -181,4 +187,10 @@ export interface TabInfo {
   title: string
   url: string
   favicon: string
+}
+
+export interface BlockedRequest {
+  tabId: string
+  url: string
+  reason: 'tracker' | 'ai-blocklist'
 }

@@ -12,9 +12,18 @@ const store = new Store<{
   apiKey: string; geminiApiKey: string
   aiProvider: 'claude' | 'gemini'
   claudeModel: string; geminiModel: string
+  mode: 'explore' | 'lockdown'
   favorites: Favorite[]; history: HistoryEntry[]
 }>()
 let anthropic: Anthropic | null = null
+
+// Session-level AI blocklist (not persisted — resets on app restart)
+export const aiBlocklist = new Set<string>()
+
+// Exported so session.ts can check mode at request time without an IPC roundtrip
+export function getLockdownMode(): boolean {
+  return store.get('mode', 'explore') === 'lockdown'
+}
 let geminiAI: GoogleGenerativeAI | null = null
 let currentAnalysisController: AbortController | null = null
 
@@ -50,7 +59,9 @@ Structure your response with these sections:
 3. **Who it shares data with**
 4. **Technologies powering this site**
 5. **Geographic & Jurisdiction Risk** — identify any third-party domains, trackers, or services linked to entities operating under Chinese, Russian, Iranian, North Korean, Belarusian, Syrian, or other high-risk government jurisdictions. Name the specific companies/domains and their country. Also use your own knowledge to flag any tracker or company names that are associated with high-risk jurisdictions even if not in the domain list. If none detected, state "No high-risk jurisdiction connections detected."
-6. **Privacy risk level**: Low / Medium / High — one sentence justification`
+6. **Privacy risk level**: Low / Medium / High — one sentence justification
+
+At the very end of your response, on its own line, output exactly: [BLOCK: domain1.com, domain2.com] listing any third-party domains you identified as high-risk trackers or data brokers that you recommend blocking. If none, omit the line entirely.`
 
 // Known high-risk company base domains → jurisdiction label
 const HIGH_RISK_DOMAINS: Record<string, string> = {
@@ -393,5 +404,17 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC.SET_AI_MODEL, (_e, model: string) => {
     const provider = store.get('aiProvider', 'claude')
     provider === 'claude' ? store.set('claudeModel', model) : store.set('geminiModel', model)
+  })
+
+  // ─── Lockdown mode ────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.GET_MODE, () => store.get('mode', 'explore'))
+
+  ipcMain.handle(IPC.SET_MODE, (_e, mode: 'explore' | 'lockdown') => {
+    store.set('mode', mode)
+    win.webContents.send(IPC.MODE_CHANGED, mode)
+  })
+
+  ipcMain.handle('ai:add-blocklist', (_e, domains: string[]) => {
+    domains.forEach(d => aiBlocklist.add(d))
   })
 }

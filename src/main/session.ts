@@ -5,6 +5,7 @@ import { matchTracker } from './trackerEngine'
 import { electronCookieToEvent, isFirstParty } from './cookies'
 import { detectFromHeaders } from './techDetector'
 import { getTabIdByWcId, getActiveTabId } from './tabManager'
+import { getLockdownMode, aiBlocklist } from './ipcHandlers'
 
 // Per-tab URL tracking (for first-party determination)
 const tabUrls = new Map<string, string>()
@@ -100,6 +101,41 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       })
     }
 
+    // In Lockdown mode: block tracker requests and AI-identified domains
+    if (getLockdownMode()) {
+      let hostname = ''
+      try { hostname = new URL(details.url).hostname } catch { /* ignore */ }
+
+      if (trackerMatch) {
+        win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'tracker' })
+        return callback({ cancel: true })
+      }
+      if (hostname && aiBlocklist.has(hostname)) {
+        win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'ai-blocklist' })
+        return callback({ cancel: true })
+      }
+    }
+
+    callback({})
+  })
+
+  // ─── Third-party cookie blocking (Lockdown mode only) ────────────────────────
+  ses.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details, callback) => {
+    if (!getLockdownMode()) return callback({})
+
+    const pageUrl = (details as unknown as { referrer?: string }).referrer || details.url
+    const pageEtld = getEtldPlusOne(pageUrl)
+    const reqEtld = getEtldPlusOne(details.url)
+    const isThirdParty = !!(pageEtld && reqEtld && pageEtld !== reqEtld)
+
+    if (!isThirdParty) return callback({})
+
+    const headers = { ...details.responseHeaders }
+    const cookieKeys = Object.keys(headers).filter(k => k.toLowerCase() === 'set-cookie')
+    if (cookieKeys.length > 0) {
+      cookieKeys.forEach(k => delete headers[k])
+      return callback({ responseHeaders: headers })
+    }
     callback({})
   })
 

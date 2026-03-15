@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Toolbar overlay — shifts WebContentsView down so dropdowns aren't hidden behind it
   setToolbarOverlay: (height: number) => ipcRenderer.invoke(IPC.TOOLBAR_OVERLAY, height),
 
+  // Lockdown mode
+  getMode: (): Promise<'explore' | 'lockdown'> => ipcRenderer.invoke(IPC.GET_MODE),
+  setMode: (mode: 'explore' | 'lockdown') => ipcRenderer.invoke(IPC.SET_MODE, mode),
+  addAiBlocklist: (domains: string[]) => ipcRenderer.invoke('ai:add-blocklist', domains),
+
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),
   maximizeWindow: () => ipcRenderer.invoke(IPC.WIN_MAXIMIZE),

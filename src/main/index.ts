@@ -5,7 +5,7 @@ import { createMainWindow, calculateWebViewBounds } from './window'
 import { setupSessionHooks, setTabUrl, getScriptUrls } from './session'
 import { loadTrackerList } from './trackerEngine'
 import { getSnapshotForUrl } from './cookies'
-import { registerIpcHandlers, recordHistory } from './ipcHandlers'
+import { registerIpcHandlers, recordHistory, getLockdownMode } from './ipcHandlers'
 import { detectFromHtml, detectFromGlobals, mergeDetections } from './techDetector'
 import {
   createTab, showTab, getWcvByTabId,
@@ -52,6 +52,39 @@ const FINGERPRINT_SCRIPT = `(function() {
   const origGetBattery = nav.getBattery;
   if (origGetBattery) {
     nav.getBattery = function() { report('battery', 'navigator.getBattery called'); return origGetBattery.call(nav); };
+  }
+})();`
+
+// Fingerprint spoofing — injected in Lockdown mode to return neutral/blank data
+const SPOOF_SCRIPT = `(function() {
+  // Canvas — clear pixel data so canvas fingerprinting returns a blank image
+  const _toDataURL = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function(type, ...args) {
+    const ctx = this.getContext && this.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, this.width, this.height);
+    return _toDataURL.apply(this, [type, ...args]);
+  };
+  // WebGL — return generic renderer/vendor strings
+  const _getParam = WebGLRenderingContext.prototype.getParameter;
+  WebGLRenderingContext.prototype.getParameter = function(p) {
+    if (p === 37445) return 'Generic Vendor';
+    if (p === 37446) return 'Generic Renderer';
+    return _getParam.apply(this, [p]);
+  };
+  if (typeof WebGL2RenderingContext !== 'undefined') {
+    const _getParam2 = WebGL2RenderingContext.prototype.getParameter;
+    WebGL2RenderingContext.prototype.getParameter = function(p) {
+      if (p === 37445) return 'Generic Vendor';
+      if (p === 37446) return 'Generic Renderer';
+      return _getParam2.apply(this, [p]);
+    };
+  }
+  // Battery — return static neutral values
+  if (navigator.getBattery) {
+    navigator.getBattery = () => Promise.resolve({
+      charging: true, chargingTime: 0, dischargingTime: Infinity, level: 1,
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false
+    });
   }
 })();`
 
@@ -109,6 +142,9 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
     win.webContents.send(IPC.NAV_PAGE_LOADED, { tabId })
 
     await wcv.webContents.executeJavaScript(FINGERPRINT_SCRIPT).catch(() => {})
+    if (getLockdownMode()) {
+      await wcv.webContents.executeJavaScript(SPOOF_SCRIPT).catch(() => {})
+    }
 
     const result = await wcv.webContents.executeJavaScript(DOM_SIGNAL_SCRIPT).catch(() => null)
     if (result) {

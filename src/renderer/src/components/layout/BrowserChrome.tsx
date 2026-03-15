@@ -3,6 +3,44 @@ import { useSiteStore } from '../../store/siteStore'
 import { ipc } from '../../lib/ipc'
 import type { Favorite, HistoryEntry } from '../../store/siteStore'
 
+function ShieldIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" className="w-4 h-4" fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'} strokeWidth="1.5">
+      <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.563 2 12.162 2 7c0-.539.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.749z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function ModeToggle() {
+  const mode = useSiteStore(s => s.mode)
+  const [pending, setPending] = useState(false)
+
+  async function toggle() {
+    setPending(true)
+    const next = mode === 'explore' ? 'lockdown' : 'explore'
+    await ipc.setMode(next)
+    useSiteStore.getState().setMode(next)
+    setPending(false)
+  }
+
+  const isLocked = mode === 'lockdown'
+  return (
+    <button
+      onClick={toggle}
+      disabled={pending}
+      title={isLocked ? 'Lockdown Mode active — click to switch to Explore Mode' : 'Explore Mode — click to enable Lockdown Mode'}
+      className={[
+        'w-7 h-7 flex items-center justify-center rounded transition-colors shrink-0',
+        isLocked
+          ? 'text-green-400 hover:bg-green-900/30'
+          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200',
+      ].join(' ')}
+    >
+      <ShieldIcon filled={isLocked} />
+    </button>
+  )
+}
+
 // Height to push WebContentsView down when a toolbar dropdown is open.
 // Covers the tallest possible dropdown (max-h-60 = 240px list + ~72px footer/button/spacing ≈ 312px).
 const DROPDOWN_OVERLAY_PX = 340
@@ -274,6 +312,11 @@ export function BrowserChrome() {
   const inputRef = useRef<HTMLInputElement>(null)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Load persisted mode on startup
+  useEffect(() => {
+    ipc.getMode().then(m => useSiteStore.getState().setMode(m))
+  }, [])
+
   // Sync display URL when nav.url changes (not while editing)
   useEffect(() => {
     if (!isEditing && nav?.url != null) {
@@ -417,12 +460,13 @@ export function BrowserChrome() {
       {/* History dropdown */}
       <HistoryDropdown />
 
-      {/* Sentinel Browser branding */}
+      {/* Sentinel Browser branding + mode toggle */}
       <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
         <svg viewBox="0 0 20 20" className="w-4 h-4 fill-blue-400 shrink-0" fill="currentColor">
           <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.563 2 12.162 2 7c0-.539.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.749z" clipRule="evenodd" />
         </svg>
         <span className="text-xs font-semibold text-gray-400 whitespace-nowrap tracking-wide">Sentinel Browser</span>
+        <ModeToggle />
       </div>
 
       {/* Loading progress bar — absolute at bottom of chrome */}

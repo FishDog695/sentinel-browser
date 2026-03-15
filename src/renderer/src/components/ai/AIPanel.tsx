@@ -41,6 +41,13 @@ export function AIPanel() {
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyInput, setKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
+  const [aiDomainsAdded, setAiDomainsAdded] = useState(false)
+
+  // Parse [BLOCK: ...] tag from completed AI analysis
+  const blockMatch = !aiStreaming ? aiAnalysis.match(/\[BLOCK:\s*([^\]]+)\]/) : null
+  const aiDomains = blockMatch
+    ? blockMatch[1].split(',').map(d => d.trim()).filter(Boolean)
+    : []
 
   useEffect(() => {
     Promise.all([ipc.getApiKey(), ipc.getGeminiKey(), ipc.getAiProvider(), ipc.getAiModel()])
@@ -73,6 +80,7 @@ export function AIPanel() {
     if (!nav?.url) return
     useSiteStore.getState().clearTabAiAnalysis(activeTabId)
     useSiteStore.getState().setTabAiStreaming(activeTabId, true)
+    setAiDomainsAdded(false)
 
     const thirdPartyDomains = [...new Set(
       requests.filter(r => !r.firstParty).map(r => {
@@ -226,6 +234,22 @@ export function AIPanel() {
         <div className="flex-1 overflow-y-auto">
           <AnalysisOutput text={aiAnalysis} streaming={aiStreaming} />
         </div>
+      )}
+
+      {/* AI-identified domains block button — shown after analysis completes */}
+      {aiDomains.length > 0 && !aiStreaming && (
+        <button
+          onClick={async () => {
+            await ipc.addAiBlocklist(aiDomains)
+            setAiDomainsAdded(true)
+          }}
+          disabled={aiDomainsAdded}
+          className="shrink-0 w-full py-1.5 text-xs bg-red-600/20 border border-red-500/30 text-red-400 rounded hover:bg-red-600/30 disabled:opacity-60 transition-colors"
+        >
+          {aiDomainsAdded
+            ? `✓ ${aiDomains.length} domain${aiDomains.length > 1 ? 's' : ''} added to block list`
+            : `Block ${aiDomains.length} AI-identified domain${aiDomains.length > 1 ? 's' : ''}`}
+        </button>
       )}
 
       {aiError && (

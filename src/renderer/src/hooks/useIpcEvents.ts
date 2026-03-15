@@ -102,6 +102,15 @@ export function useIpcEvents() {
         useSiteStore.getState().setTabAiStreaming(activeTabId, false)
       }),
 
+      // ─── Lockdown mode ───────────────────────────────────────────────────────
+      ipc.on(IPC.MODE_CHANGED, (mode) => {
+        useSiteStore.getState().setMode(mode as 'explore' | 'lockdown')
+      }),
+      ipc.on(IPC.BLOCKED_REQUEST, (data) => {
+        const { tabId } = data as { tabId: string }
+        useSiteStore.getState().incrementBlockedCount(tabId)
+      }),
+
       // ─── Tab management ──────────────────────────────────────────────────────
       ipc.on(IPC.TAB_CREATED, (data) => {
         const { tabId, isActive } = data as { tabId: string; isActive?: boolean }

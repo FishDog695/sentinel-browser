@@ -52,6 +52,8 @@ function StatusBar() {
   const loading = useSiteStore(s => s.tabs[activeTabId]?.nav.loading ?? false)
   const trackerCount = useSiteStore(s => s.tabs[activeTabId]?.trackers.size ?? 0)
   const requestCount = useSiteStore(s => s.tabs[activeTabId]?.networkRequests.length ?? 0)
+  const blockedCount = useSiteStore(s => s.tabs[activeTabId]?.blockedCount ?? 0)
+  const mode = useSiteStore(s => s.mode)
 
   return (
     <div className="h-5 bg-gray-950 border-t border-gray-800 flex items-center px-3 gap-4 text-xs text-gray-500 shrink-0">
@@ -60,7 +62,12 @@ function StatusBar() {
           <span className="animate-spin inline-block">↻</span> Loading…
         </span>
       )}
-      {trackerCount > 0 && (
+      {mode === 'lockdown' && (
+        <span className="text-green-400 flex items-center gap-1">
+          🛡 Lockdown{blockedCount > 0 ? ` · ${blockedCount} blocked` : ''}
+        </span>
+      )}
+      {trackerCount > 0 && mode !== 'lockdown' && (
         <span className="text-orange-400">{trackerCount} tracker{trackerCount !== 1 ? 's' : ''}</span>
       )}
       <span className="ml-auto">{requestCount} requests</span>

@@ -29,6 +29,7 @@ export interface TabState {
   aiAnalysis: string
   aiStreaming: boolean
   aiError: string | null
+  blockedCount: number
 }
 
 function emptyNavState(): NavState {
@@ -48,6 +49,7 @@ export function createEmptyTabState(id: string): TabState {
     aiAnalysis: '',
     aiStreaming: false,
     aiError: null,
+    blockedCount: 0,
   }
 }
 
@@ -64,6 +66,10 @@ interface SiteStore {
   // History (global, persisted via electron-store)
   history: HistoryEntry[]
   setHistory: (entries: HistoryEntry[]) => void
+
+  // Global mode (Explore vs Lockdown)
+  mode: 'explore' | 'lockdown'
+  setMode: (mode: 'explore' | 'lockdown') => void
 
   // Global UI state
   activePanel: PanelTab
@@ -101,6 +107,9 @@ interface SiteStore {
   setTabAiError: (tabId: string, e: string | null) => void
   clearTabAiAnalysis: (tabId: string) => void
 
+  // Per-tab blocked count
+  incrementBlockedCount: (tabId: string) => void
+
   // Global UI actions
   setActivePanel: (tab: PanelTab) => void
   setPanelWidth: (w: number) => void
@@ -128,6 +137,9 @@ export const useSiteStore = create<SiteStore>((set) => ({
 
   history: [],
   setHistory: (entries) => set({ history: entries }),
+
+  mode: 'explore',
+  setMode: (mode) => set({ mode }),
 
   activePanel: 'cookies',
   panelWidth: 360,
@@ -166,6 +178,7 @@ export const useSiteStore = create<SiteStore>((set) => ({
       aiAnalysis: '',
       aiError: null,
       aiStreaming: false,
+      blockedCount: 0,
     })),
   })),
 
@@ -249,6 +262,11 @@ export const useSiteStore = create<SiteStore>((set) => ({
 
   clearTabAiAnalysis: (tabId) => set((s) => ({
     tabs: patchTab(s.tabs, tabId, () => ({ aiAnalysis: '', aiError: null })),
+  })),
+
+  // ─── Per-tab blocked count ───────────────────────────────────────────────────
+  incrementBlockedCount: (tabId) => set((s) => ({
+    tabs: patchTab(s.tabs, tabId, (tab) => ({ blockedCount: tab.blockedCount + 1 })),
   })),
 
   // ─── Global UI ───────────────────────────────────────────────────────────────
