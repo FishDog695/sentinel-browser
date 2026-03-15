@@ -110,10 +110,12 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
     }
 
     // In Lockdown mode: block tracker sub-resources and AI-identified domains.
-    // Never block mainFrame or subFrame navigations — the user must always be
-    // able to navigate to any URL they type; only third-party embeds are blocked.
+    // Never block mainFrame/subFrame navigations (user-initiated page loads) or
+    // first-party resources — only third-party embeds from other domains are blocked.
+    // First-party exemption prevents blocking things like reCAPTCHA scripts that
+    // are served from the same site the user is visiting (e.g. google.com on google.com).
     const isNavigation = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame'
-    if (getLockdownMode() && !isNavigation) {
+    if (getLockdownMode() && !isNavigation && !firstParty) {
       let hostname = ''
       try { hostname = new URL(details.url).hostname } catch { /* ignore */ }
 

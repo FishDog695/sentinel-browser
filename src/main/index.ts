@@ -57,12 +57,15 @@ const FINGERPRINT_SCRIPT = `(function() {
 
 // Fingerprint spoofing — injected in Lockdown mode to return neutral/blank data
 const SPOOF_SCRIPT = `(function() {
-  // Canvas — clear pixel data so canvas fingerprinting returns a blank image
+  // Canvas — return data from an identically-sized blank canvas so fingerprinting
+  // reads get noise, but the original canvas pixels are left untouched (preserving
+  // rendered UI like CAPTCHA widgets that draw on canvas).
   const _toDataURL = HTMLCanvasElement.prototype.toDataURL;
   HTMLCanvasElement.prototype.toDataURL = function(type, ...args) {
-    const ctx = this.getContext && this.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, this.width, this.height);
-    return _toDataURL.apply(this, [type, ...args]);
+    const blank = document.createElement('canvas');
+    blank.width = this.width || 1;
+    blank.height = this.height || 1;
+    return _toDataURL.apply(blank, [type, ...args]);
   };
   // WebGL — return generic renderer/vendor strings
   const _getParam = WebGLRenderingContext.prototype.getParameter;
