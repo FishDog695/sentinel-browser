@@ -44,9 +44,15 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
   )
 
+  // Helper — returns true if the window and its webContents are still alive
+  function winAlive(): boolean {
+    return !win.isDestroyed() && !win.webContents.isDestroyed()
+  }
+
   // ─── Cookies ────────────────────────────────────────────────────────────────
   // Cookie events are session-level; route them to the currently active tab
   ses.cookies.on('changed', (_event, cookie, cause, removed) => {
+    if (!winAlive()) return   // window already destroyed (e.g. cleanup on exit)
     const activeId = getActiveTabId()
     const pageUrl = tabUrls.get(activeId) ?? ''
     const event = electronCookieToEvent(cookie, pageUrl)
@@ -89,16 +95,18 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       trackerCategory: trackerMatch?.category,
     }
 
-    win.webContents.send(IPC.NETWORK_REQUEST, { ...req, tabId })
+    if (winAlive()) {
+      win.webContents.send(IPC.NETWORK_REQUEST, { ...req, tabId })
 
-    if (trackerMatch) {
-      win.webContents.send(IPC.TRACKER_DETECTED, {
-        url: details.url,
-        category: trackerMatch.category,
-        name: trackerMatch.company,
-        domain: trackerMatch.domain,
-        tabId,
-      })
+      if (trackerMatch) {
+        win.webContents.send(IPC.TRACKER_DETECTED, {
+          url: details.url,
+          category: trackerMatch.category,
+          name: trackerMatch.company,
+          domain: trackerMatch.domain,
+          tabId,
+        })
+      }
     }
 
     // In Lockdown mode: block tracker requests and AI-identified domains
@@ -107,11 +115,11 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       try { hostname = new URL(details.url).hostname } catch { /* ignore */ }
 
       if (trackerMatch) {
-        win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'tracker' })
+        if (winAlive()) win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'tracker' })
         return callback({ cancel: true })
       }
       if (hostname && aiBlocklist.has(hostname)) {
-        win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'ai-blocklist' })
+        if (winAlive()) win.webContents.send(IPC.BLOCKED_REQUEST, { tabId, url: details.url, reason: 'ai-blocklist' })
         return callback({ cancel: true })
       }
     }
@@ -158,6 +166,8 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       size: headers['content-length'] ? parseInt(headers['content-length']) : undefined,
       timing,
     }
+
+    if (!winAlive()) return
 
     win.webContents.send(IPC.NETWORK_RESPONSE, { ...resp, tabId })
 
