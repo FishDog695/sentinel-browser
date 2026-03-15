@@ -16,6 +16,10 @@ const store = new Store<{
   clearHistoryOnClose: boolean
   favorites: Favorite[]; history: HistoryEntry[]
 }>()
+
+// Always start in Explore mode — mode is not persisted across sessions
+store.set('mode', 'explore')
+
 let anthropic: Anthropic | null = null
 
 // Session-level AI blocklist (not persisted — resets on app restart)

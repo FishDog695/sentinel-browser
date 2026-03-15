@@ -110,13 +110,19 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
   const wcv = getWcvByTabId(tabId)
   if (!wcv) return
 
+  function ok(): boolean {
+    return !win.isDestroyed() && !win.webContents.isDestroyed()
+  }
+
   wcv.webContents.on('did-start-loading', () => {
+    if (!ok()) return
     win.webContents.send(IPC.NAV_PAGE_LOADING, { tabId, url: wcv.webContents.getURL() })
   })
 
   wcv.webContents.on('did-navigate', async (_e, url) => {
     setTabUrl(tabId, url)
     updateTabMeta(tabId, { url })
+    if (!ok()) return
     win.webContents.send(IPC.NAV_URL_CHANGED, { tabId, url })
     win.webContents.send(IPC.NAV_HISTORY_CHANGED, {
       tabId,
@@ -124,16 +130,19 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
       canGoForward: wcv.webContents.navigationHistory.canGoForward(),
     })
     const cookies = await getSnapshotForUrl(url)
+    if (!ok()) return
     win.webContents.send(IPC.COOKIES_SNAPSHOT, { cookies, tabId })
   })
 
   wcv.webContents.on('did-navigate-in-page', (_e, url) => {
     updateTabMeta(tabId, { url })
+    if (!ok()) return
     win.webContents.send(IPC.NAV_URL_CHANGED, { tabId, url })
   })
 
   wcv.webContents.on('page-title-updated', (_e, title) => {
     updateTabMeta(tabId, { title })
+    if (!ok()) return
     win.webContents.send(IPC.NAV_TITLE_CHANGED, { tabId, title })
     const m = getTabMeta(tabId)
     if (m) {
@@ -143,6 +152,7 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
   })
 
   wcv.webContents.on('did-finish-load', async () => {
+    if (!ok()) return
     win.webContents.send(IPC.NAV_PAGE_LOADED, { tabId })
 
     await wcv.webContents.executeJavaScript(FINGERPRINT_SCRIPT).catch(() => {})
@@ -151,6 +161,7 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
     }
 
     const result = await wcv.webContents.executeJavaScript(DOM_SIGNAL_SCRIPT).catch(() => null)
+    if (!ok()) return
     if (result) {
       const { globals, html } = JSON.parse(result)
       const techHtml = detectFromHtml(html, getScriptUrls(tabId))
@@ -164,6 +175,7 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
 
   wcv.webContents.on('ipc-message', (_e, channel, ...args) => {
     if (channel === '__sentinel_fp__') {
+      if (!ok()) return
       win.webContents.send(IPC.FINGERPRINT_ATTEMPT, { ...args[0], timestamp: Date.now(), tabId })
     }
   })
@@ -171,6 +183,7 @@ export function setupTabEvents(win: BrowserWindow, tabId: string) {
   wcv.webContents.on('page-favicon-updated', (_e, favicons) => {
     if (favicons.length > 0) {
       updateTabMeta(tabId, { favicon: favicons[0] })
+      if (!ok()) return
       win.webContents.send(IPC.NAV_FAVICON, { tabId, url: favicons[0] })
       const m = getTabMeta(tabId)
       if (m) {

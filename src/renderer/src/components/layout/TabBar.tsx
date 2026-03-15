@@ -111,7 +111,7 @@ export function TabBar() {
         {/* New tab button */}
         <button
           onClick={handleNewTab}
-          className="flex items-center justify-center w-8 shrink-0 text-gray-500 hover:text-gray-300 hover:bg-gray-800/50 transition-colors"
+          className="flex items-center justify-center w-8 h-7 self-center shrink-0 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800/50 transition-colors"
           title="New tab"
         >
           <svg viewBox="0 0 12 12" className="w-3 h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none">
