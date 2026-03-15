@@ -30,6 +30,8 @@ declare global {
       getMode: () => Promise<'explore' | 'lockdown'>
       setMode: (mode: 'explore' | 'lockdown') => Promise<void>
       addAiBlocklist: (domains: string[]) => Promise<void>
+      getClearOnClose: () => Promise<boolean>
+      setClearOnClose: (v: boolean) => Promise<void>
       createTab: () => Promise<string>
       closeTab: (tabId: string) => Promise<void>
       switchTab: (tabId: string) => Promise<void>
@@ -69,6 +71,8 @@ export const ipc = {
   getMode: () => window.electronAPI.getMode(),
   setMode: (mode: 'explore' | 'lockdown') => window.electronAPI.setMode(mode),
   addAiBlocklist: (domains: string[]) => window.electronAPI.addAiBlocklist(domains),
+  getClearOnClose: () => window.electronAPI.getClearOnClose(),
+  setClearOnClose: (v: boolean) => window.electronAPI.setClearOnClose(v),
   createTab: () => window.electronAPI.createTab(),
   closeTab: (tabId: string) => window.electronAPI.closeTab(tabId),
   switchTab: (tabId: string) => window.electronAPI.switchTab(tabId),

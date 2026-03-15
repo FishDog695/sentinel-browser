@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setMode: (mode: 'explore' | 'lockdown') => ipcRenderer.invoke(IPC.SET_MODE, mode),
   addAiBlocklist: (domains: string[]) => ipcRenderer.invoke('ai:add-blocklist', domains),
 
+  // Privacy cleanup settings
+  getClearOnClose: (): Promise<boolean> => ipcRenderer.invoke(IPC.GET_CLEAR_ON_CLOSE),
+  setClearOnClose: (v: boolean) => ipcRenderer.invoke(IPC.SET_CLEAR_ON_CLOSE, v),
+
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),
   maximizeWindow: () => ipcRenderer.invoke(IPC.WIN_MAXIMIZE),

@@ -1,11 +1,11 @@
-import { app, BrowserWindow, protocol, net } from 'electron'
+import { app, BrowserWindow, protocol, net, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { createMainWindow, calculateWebViewBounds } from './window'
 import { setupSessionHooks, setTabUrl, getScriptUrls } from './session'
 import { loadTrackerList } from './trackerEngine'
 import { getSnapshotForUrl } from './cookies'
-import { registerIpcHandlers, recordHistory, getLockdownMode } from './ipcHandlers'
+import { registerIpcHandlers, recordHistory, getLockdownMode, getClearHistoryOnClose, clearHistoryStore } from './ipcHandlers'
 import { detectFromHtml, detectFromGlobals, mergeDetections } from './techDetector'
 import {
   createTab, showTab, getWcvByTabId,
@@ -241,6 +241,27 @@ app.whenReady().then(async () => {
       createMainWindow()
     }
   })
+})
+
+// Privacy cleanup on exit — always clear cache/cookies/storage, optionally clear history
+app.on('before-quit', async (e) => {
+  e.preventDefault()
+  const ses = session.defaultSession
+  try {
+    await Promise.all([
+      ses.clearCache(),
+      ses.clearAuthCache(),
+      ses.clearStorageData({
+        storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage', 'serviceworkers', 'shadercache', 'websql', 'filesystem'],
+      }),
+    ])
+    if (getClearHistoryOnClose()) {
+      clearHistoryStore()
+    }
+  } catch {
+    // Never block shutdown on cleanup errors
+  }
+  app.exit(0)
 })
 
 app.on('window-all-closed', () => {

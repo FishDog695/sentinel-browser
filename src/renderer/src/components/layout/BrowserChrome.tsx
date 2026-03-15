@@ -209,6 +209,12 @@ function HistoryDropdown() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const history = useSiteStore(s => s.history)
+  const [clearOnClose, setClearOnClose] = useState(false)
+
+  // Load persisted setting when dropdown first opens
+  useEffect(() => {
+    ipc.getClearOnClose().then(v => setClearOnClose(v))
+  }, [])
 
   const toggle = useCallback((next: boolean) => {
     setOpen(next)
@@ -230,6 +236,12 @@ function HistoryDropdown() {
   async function handleClear() {
     const updated = await ipc.clearHistory()
     useSiteStore.getState().setHistory(updated)
+  }
+
+  async function handleToggleClearOnClose() {
+    const next = !clearOnClose
+    setClearOnClose(next)
+    await ipc.setClearOnClose(next)
   }
 
   function handleNavigate(url: string) {
@@ -263,37 +275,57 @@ function HistoryDropdown() {
           {history.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-gray-500">No browsing history yet.</div>
           ) : (
-            <>
-              <div className="max-h-60 overflow-y-auto">
-                {history.map((entry: HistoryEntry) => (
-                  <div
-                    key={entry.url + entry.visitedAt}
-                    onClick={() => handleNavigate(entry.url)}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800 cursor-pointer"
-                  >
-                    {entry.favicon ? (
-                      <img src={entry.favicon} className="w-4 h-4 shrink-0" alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    ) : (
-                      <div className="w-4 h-4 shrink-0 rounded-sm bg-gray-700" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-200 truncate">{entry.title || entry.url}</div>
-                      <div className="text-xs text-gray-500 truncate">{getHostname(entry.url)}</div>
-                    </div>
-                    <span className="text-xs text-gray-600 shrink-0 ml-1">{formatTime(entry.visitedAt)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gray-700 px-3 py-2">
-                <button
-                  onClick={handleClear}
-                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            <div className="max-h-60 overflow-y-auto">
+              {history.map((entry: HistoryEntry) => (
+                <div
+                  key={entry.url + entry.visitedAt}
+                  onClick={() => handleNavigate(entry.url)}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800 cursor-pointer"
                 >
-                  Clear history
-                </button>
-              </div>
-            </>
+                  {entry.favicon ? (
+                    <img src={entry.favicon} className="w-4 h-4 shrink-0" alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  ) : (
+                    <div className="w-4 h-4 shrink-0 rounded-sm bg-gray-700" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-200 truncate">{entry.title || entry.url}</div>
+                    <div className="text-xs text-gray-500 truncate">{getHostname(entry.url)}</div>
+                  </div>
+                  <span className="text-xs text-gray-600 shrink-0 ml-1">{formatTime(entry.visitedAt)}</span>
+                </div>
+              ))}
+            </div>
           )}
+
+          {/* Footer: clear now + clear-on-close toggle */}
+          <div className="border-t border-gray-700 px-3 py-2 flex items-center justify-between gap-3">
+            <button
+              onClick={handleClear}
+              className="text-xs text-red-400 hover:text-red-300 transition-colors shrink-0"
+            >
+              Clear history
+            </button>
+            <button
+              onClick={handleToggleClearOnClose}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors ml-auto shrink-0"
+              title="Automatically clear history when Sentinel closes"
+            >
+              <span
+                className={[
+                  'w-7 h-4 rounded-full relative transition-colors',
+                  clearOnClose ? 'bg-blue-600' : 'bg-gray-600',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform',
+                    clearOnClose ? 'translate-x-3.5' : 'translate-x-0.5',
+                  ].join(' ')}
+                />
+              </span>
+              Clear on close
+            </button>
+          </div>
         </div>
       )}
     </div>

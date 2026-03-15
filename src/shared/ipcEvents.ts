@@ -84,6 +84,10 @@ export const IPC = {
   SET_MODE:        'settings:set-mode',
   MODE_CHANGED:    'settings:mode-changed',   // Main → Renderer push
   BLOCKED_REQUEST: 'network:blocked',          // Main → Renderer push
+
+  // Privacy cleanup settings
+  GET_CLEAR_ON_CLOSE: 'settings:get-clear-on-close',
+  SET_CLEAR_ON_CLOSE: 'settings:set-clear-on-close',
 } as const
 
 export type IpcChannel = typeof IPC[keyof typeof IPC]

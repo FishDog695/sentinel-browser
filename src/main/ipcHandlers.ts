@@ -13,6 +13,7 @@ const store = new Store<{
   aiProvider: 'claude' | 'gemini'
   claudeModel: string; geminiModel: string
   mode: 'explore' | 'lockdown'
+  clearHistoryOnClose: boolean
   favorites: Favorite[]; history: HistoryEntry[]
 }>()
 let anthropic: Anthropic | null = null
@@ -23,6 +24,15 @@ export const aiBlocklist = new Set<string>()
 // Exported so session.ts can check mode at request time without an IPC roundtrip
 export function getLockdownMode(): boolean {
   return store.get('mode', 'explore') === 'lockdown'
+}
+
+// Exported so index.ts can read the setting in the before-quit handler
+export function getClearHistoryOnClose(): boolean {
+  return store.get('clearHistoryOnClose', false)
+}
+
+export function clearHistoryStore(): void {
+  store.set('history', [])
 }
 let geminiAI: GoogleGenerativeAI | null = null
 let currentAnalysisController: AbortController | null = null
@@ -416,5 +426,11 @@ export function registerIpcHandlers(
 
   ipcMain.handle('ai:add-blocklist', (_e, domains: string[]) => {
     domains.forEach(d => aiBlocklist.add(d))
+  })
+
+  // ─── Privacy cleanup settings ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.GET_CLEAR_ON_CLOSE, () => store.get('clearHistoryOnClose', false))
+  ipcMain.handle(IPC.SET_CLEAR_ON_CLOSE, (_e, value: boolean) => {
+    store.set('clearHistoryOnClose', value)
   })
 }
