@@ -272,13 +272,16 @@ export function registerIpcHandlers(
     })
   })
 
-  ipcMain.handle(IPC.TAB_CREATE, async () => {
+  ipcMain.handle(IPC.TAB_CREATE, () => {
     const { tabId, wcv } = createTab(win)
     setupTabEvents(win, tabId)
     const [w, h] = win.getContentSize()
     const bounds = calculateWebViewBounds({ width: w, height: h, panelWidth: getPanelWidth() })
     showTab(tabId, bounds)
-    await wcv.webContents.loadURL('sentinel://newtab')
+    // Fire-and-forget: don't await loadURL. Awaiting causes the handler to throw
+    // ERR_ABORTED when another tab's in-flight navigation is aborted by showTab()
+    // hiding it (setting bounds to 0). TAB_CREATED must be sent regardless.
+    wcv.webContents.loadURL('sentinel://newtab').catch(() => {})
     const meta = getTabMeta(tabId)!
     win.webContents.send(IPC.TAB_CREATED, {
       tabId: meta.id, url: meta.url, title: meta.title, favicon: meta.favicon, isActive: true,

@@ -239,8 +239,8 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Load initial page
-  await wcv.webContents.loadURL('sentinel://newtab')
+  // Load initial page (fire-and-forget — navigation events handled by setupTabEvents)
+  wcv.webContents.loadURL('sentinel://newtab').catch(() => {})
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
