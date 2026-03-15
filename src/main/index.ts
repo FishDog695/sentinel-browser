@@ -1,5 +1,6 @@
 import { app, BrowserWindow, protocol, net, session } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { createMainWindow, calculateWebViewBounds } from './window'
 import { setupSessionHooks, setTabUrl, getScriptUrls } from './session'
@@ -193,8 +194,10 @@ app.whenReady().then(async () => {
       ? process.resourcesPath
       : join(__dirname, '../../resources')
     if (new URL(request.url).hostname === 'newtab') {
-      const filePath = join(resourcesPath, 'newtab.html').replace(/\\/g, '/')
-      return net.fetch('file://' + filePath)
+      // Use pathToFileURL so spaces and special chars in the app path are
+      // properly percent-encoded (e.g. "Sentinel Browser.app" on macOS).
+      const fileUrl = pathToFileURL(join(resourcesPath, 'newtab.html')).href
+      return net.fetch(fileUrl)
     }
     return new Response('Not found', { status: 404 })
   })

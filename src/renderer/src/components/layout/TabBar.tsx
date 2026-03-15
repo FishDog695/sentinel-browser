@@ -8,7 +8,8 @@ export function TabBar() {
   const activeTabId = useSiteStore(s => s.activeTabId)
 
   const [isMaximized, setIsMaximized] = useState(false)
-  const isWin = ipc.platform() !== 'darwin'
+  const isMac = ipc.platform() === 'darwin'
+  const isWin = !isMac
 
   useEffect(() => {
     ipc.isMaximized().then(setIsMaximized)
@@ -41,10 +42,10 @@ export function TabBar() {
       className="h-10 bg-gray-950 border-b border-gray-800 flex items-stretch shrink-0"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {/* Tab pills */}
+      {/* Tab pills — on macOS leave room for the native traffic-light buttons (~78px) */}
       <div
         className="flex items-end overflow-x-auto min-w-0 px-1"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        style={{ WebkitAppRegion: 'no-drag', paddingLeft: isMac ? '82px' : '4px' } as React.CSSProperties}
       >
         {tabOrder.map(tabId => {
           const tab = tabs[tabId]
