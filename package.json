@@ -43,8 +43,13 @@
     "productName": "Sentinel Browser",
     "copyright": "Copyright © 2025",
     "files": [
-      "out/**/*",
-      "resources/**/*"
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
     ],
     "win": {
       "target": "nsis",
