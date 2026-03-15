@@ -109,8 +109,11 @@ export function setupSessionHooks(win: BrowserWindow, wcv: WebContentsView) {
       }
     }
 
-    // In Lockdown mode: block tracker requests and AI-identified domains
-    if (getLockdownMode()) {
+    // In Lockdown mode: block tracker sub-resources and AI-identified domains.
+    // Never block mainFrame or subFrame navigations — the user must always be
+    // able to navigate to any URL they type; only third-party embeds are blocked.
+    const isNavigation = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame'
+    if (getLockdownMode() && !isNavigation) {
       let hostname = ''
       try { hostname = new URL(details.url).hostname } catch { /* ignore */ }
 
