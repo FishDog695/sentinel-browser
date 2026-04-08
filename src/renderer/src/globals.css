@@ -19,9 +19,9 @@
 }
 
 [data-mode="lockdown"] {
-  --shell-bg: #020d06;
-  --shell-panel: #071409;
-  --shell-border: #0f2e14;
+  --shell-bg: #071f0a;
+  --shell-panel: #0d2e12;
+  --shell-border: #1a4d22;
   --shell-tab-active-bg: #d1fae5;
   --shell-tab-active-text: #065f46;
   --shell-tab-active-border: #10b981;
