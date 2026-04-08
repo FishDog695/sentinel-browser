@@ -424,14 +424,14 @@ export function BrowserChrome() {
 
   return (
     <div
-      className="h-11 bg-[var(--shell-bg)] border-b border-[var(--shell-border)] flex items-center gap-1.5 px-2 shrink-0 relative"
+      className="h-11 [background-color:var(--shell-bg)] border-b border-[var(--shell-border)] flex items-center gap-1.5 px-2 shrink-0 relative"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
       {/* Back */}
       <button
         onClick={() => ipc.navigateBack()}
         disabled={!nav?.canGoBack}
-        className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--shell-hover-bg)] disabled:cursor-not-allowed transition-colors"
+        className="w-7 h-7 flex items-center justify-center rounded hover:[background-color:var(--shell-hover-bg)] disabled:cursor-not-allowed transition-colors"
         title="Back"
       >
         <IconBack disabled={!nav?.canGoBack} />
@@ -441,7 +441,7 @@ export function BrowserChrome() {
       <button
         onClick={() => ipc.navigateForward()}
         disabled={!nav?.canGoForward}
-        className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--shell-hover-bg)] disabled:cursor-not-allowed transition-colors"
+        className="w-7 h-7 flex items-center justify-center rounded hover:[background-color:var(--shell-hover-bg)] disabled:cursor-not-allowed transition-colors"
         title="Forward"
       >
         <IconForward disabled={!nav?.canGoForward} />
@@ -458,7 +458,7 @@ export function BrowserChrome() {
 
       {/* URL bar with star inside */}
       <form onSubmit={handleNavigate} className="flex-1 max-w-[560px]">
-        <div className="flex items-center bg-[var(--shell-url-bg)] rounded-md border border-[var(--shell-url-border)] focus-within:border-[var(--shell-url-focus-border)] px-2 h-8 gap-1.5 transition-colors">
+        <div className="flex items-center [background-color:var(--shell-url-bg)] rounded-md border border-[var(--shell-url-border)] focus-within:border-[var(--shell-url-focus-border)] px-2 h-8 gap-1.5 transition-colors">
           {/* HTTPS badge */}
           {url && (
             <span
@@ -528,7 +528,7 @@ export function BrowserChrome() {
       {/* Loading progress bar — absolute at bottom of chrome */}
       {loadProgress > 0 && loadProgress < 100 && (
         <div
-          className="absolute bottom-0 left-0 h-0.5 bg-[var(--shell-progress)] transition-[width] duration-300 ease-out"
+          className="absolute bottom-0 left-0 h-0.5 [background-color:var(--shell-progress)] transition-[width] duration-300 ease-out"
           style={{ width: loadProgress + '%' }}
         />
       )}

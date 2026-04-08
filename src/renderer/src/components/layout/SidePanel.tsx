@@ -38,7 +38,7 @@ export function SidePanel() {
       <div className="flex flex-col items-center py-2 gap-1 w-full">
         <button
           onClick={expand}
-          className="w-10 h-8 flex items-center justify-center rounded hover:bg-[var(--shell-hover-bg)] text-[var(--shell-text-muted)] text-sm"
+          className="w-10 h-8 flex items-center justify-center rounded hover:[background-color:var(--shell-hover-bg)] [color:var(--shell-text-muted)] text-sm"
           title="Expand panel"
         >
           ◀
@@ -49,7 +49,7 @@ export function SidePanel() {
             <button
               key={tab.id}
               onClick={() => { setActivePanel(tab.id); expand() }}
-              className="w-10 h-10 flex flex-col items-center justify-center rounded hover:bg-[var(--shell-hover-bg)] text-[var(--shell-text-muted)] relative"
+              className="w-10 h-10 flex flex-col items-center justify-center rounded hover:[background-color:var(--shell-hover-bg)] [color:var(--shell-text-muted)] relative"
               title={tab.label}
             >
               <span className="text-base">{tab.icon}</span>
@@ -68,10 +68,10 @@ export function SidePanel() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-[var(--shell-border)] bg-[var(--shell-bg)] overflow-x-auto shrink-0">
+      <div className="flex items-center border-b border-[var(--shell-border)] [background-color:var(--shell-bg)] overflow-x-auto shrink-0">
         <button
           onClick={collapse}
-          className="px-2 py-2 text-[var(--shell-text-muted)] hover:text-gray-300 shrink-0"
+          className="px-2 py-2 [color:var(--shell-text-muted)] hover:text-gray-300 shrink-0"
           title="Collapse panel"
         >
           ▶
