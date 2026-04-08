@@ -33,8 +33,10 @@ export default function App() {
   const panelWidth = useSiteStore(s => s.panelWidth)
   const effectivePanelWidth = isPanelCollapsed ? 48 : panelWidth
 
+  const mode = useSiteStore(s => s.mode)
+
   return (
-    <div className="flex flex-col h-screen bg-gray-950 select-none overflow-hidden">
+    <div className="flex flex-col h-screen bg-[var(--shell-bg)] select-none overflow-hidden" data-mode={mode}>
       {/* Tab bar (40px) — includes drag region + window controls */}
       <TabBar />
 
@@ -49,7 +51,7 @@ export default function App() {
 
         {/* Side panel */}
         <div
-          className="flex flex-col border-l border-gray-800 bg-gray-900 shrink-0 transition-[width] duration-200 overflow-hidden"
+          className="flex flex-col border-l border-[var(--shell-border)] bg-[var(--shell-panel)] shrink-0 transition-[width] duration-200 overflow-hidden"
           style={{ width: effectivePanelWidth }}
         >
           <SidePanel />
@@ -71,7 +73,7 @@ function StatusBar() {
   const mode = useSiteStore(s => s.mode)
 
   return (
-    <div className="h-5 bg-gray-950 border-t border-gray-800 flex items-center px-3 gap-4 text-xs text-gray-500 shrink-0">
+    <div className="h-5 bg-[var(--shell-bg)] border-t border-[var(--shell-border)] flex items-center px-3 gap-4 text-xs text-[var(--shell-text-muted)] shrink-0">
       {loading && (
         <span className="flex items-center gap-1">
           <span className="animate-spin inline-block">↻</span> Loading…

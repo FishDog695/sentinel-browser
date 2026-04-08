@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --shell-bg: #030712;
+  --shell-panel: #111827;
+  --shell-border: #1f2937;
+  --shell-tab-active-bg: #e2e4e6;
+  --shell-tab-active-text: #111827;
+  --shell-tab-active-border: #3b82f6;
+  --shell-tab-inactive-bg: rgba(31,41,55,0.5);
+  --shell-text-muted: #6b7280;
+  --shell-hover-bg: #1f2937;
+  --shell-url-bg: #ffffff;
+  --shell-url-border: #d1d5db;
+  --shell-url-focus-border: #3b82f6;
+  --shell-progress: #3b82f6;
+}
+
+[data-mode="lockdown"] {
+  --shell-bg: #020d06;
+  --shell-panel: #071409;
+  --shell-border: #0f2e14;
+  --shell-tab-active-bg: #d1fae5;
+  --shell-tab-active-text: #065f46;
+  --shell-tab-active-border: #10b981;
+  --shell-tab-inactive-bg: rgba(7,20,9,0.5);
+  --shell-text-muted: #4ade80;
+  --shell-hover-bg: #0f2e14;
+  --shell-url-bg: #f0fdf4;
+  --shell-url-border: #6ee7b7;
+  --shell-url-focus-border: #10b981;
+  --shell-progress: #10b981;
+}
+
+[data-mode] * {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
