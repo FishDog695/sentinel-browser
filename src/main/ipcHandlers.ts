@@ -41,23 +41,35 @@ export function clearHistoryStore(): void {
 let geminiAI: GoogleGenerativeAI | null = null
 let currentAnalysisController: AbortController | null = null
 
-function getGeminiClient(): GoogleGenerativeAI | null {
-  if (geminiAI) return geminiAI
-  const encKey = store.get('geminiApiKey')
+// The synchronous safeStorage methods are deprecated in Electron 45 and removed in 46.
+// Keys saved with the old encryptString() still decrypt with decryptStringAsync().
+async function encryptKey(plain: string): Promise<string> {
+  return (await safeStorage.encryptStringAsync(plain)).toString('base64')
+}
+
+async function decryptKey(storeKey: 'apiKey' | 'geminiApiKey'): Promise<string | null> {
+  const encKey = store.get(storeKey)
   if (!encKey) return null
+  const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(Buffer.from(encKey, 'base64'))
+  if (shouldReEncrypt) store.set(storeKey, await encryptKey(result))
+  return result
+}
+
+async function getGeminiClient(): Promise<GoogleGenerativeAI | null> {
+  if (geminiAI) return geminiAI
   try {
-    const key = safeStorage.decryptString(Buffer.from(encKey, 'base64'))
+    const key = await decryptKey('geminiApiKey')
+    if (!key) return null
     geminiAI = new GoogleGenerativeAI(key)
     return geminiAI
   } catch { return null }
 }
 
-function getAnthropicClient(): Anthropic | null {
+async function getAnthropicClient(): Promise<Anthropic | null> {
   if (anthropic) return anthropic
-  const encKey = store.get('apiKey')
-  if (!encKey) return null
   try {
-    const key = safeStorage.decryptString(Buffer.from(encKey, 'base64'))
+    const key = await decryptKey('apiKey')
+    if (!key) return null
     anthropic = new Anthropic({ apiKey: key })
     return anthropic
   } catch { return null }
@@ -322,9 +334,8 @@ export function registerIpcHandlers(
     const encKey = store.get('apiKey')
     return !!encKey
   })
-  ipcMain.handle(IPC.SET_API_KEY, (_e, apiKey: string) => {
-    const encrypted = safeStorage.encryptString(apiKey)
-    store.set('apiKey', encrypted.toString('base64'))
+  ipcMain.handle(IPC.SET_API_KEY, async (_e, apiKey: string) => {
+    store.set('apiKey', await encryptKey(apiKey))
     anthropic = null
   })
 
@@ -357,7 +368,7 @@ export function registerIpcHandlers(
     const provider = store.get('aiProvider', 'claude')
 
     if (provider === 'gemini') {
-      const genAI = getGeminiClient()
+      const genAI = await getGeminiClient()
       if (!genAI) {
         event.sender.send(IPC.AI_STREAM_ERROR, { message: 'No Gemini API key configured. Add it in AI panel settings.' })
         return
@@ -384,7 +395,7 @@ export function registerIpcHandlers(
     }
 
     // Claude path
-    const client = getAnthropicClient()
+    const client = await getAnthropicClient()
     if (!client) {
       event.sender.send(IPC.AI_STREAM_ERROR, { message: 'No API key configured. Please add your Anthropic API key in settings.' })
       return
@@ -423,8 +434,8 @@ export function registerIpcHandlers(
 
   // ─── Gemini key + provider + model settings ───────────────────────────────────
   ipcMain.handle(IPC.GET_GEMINI_KEY, () => !!store.get('geminiApiKey'))
-  ipcMain.handle(IPC.SET_GEMINI_KEY, (_e, apiKey: string) => {
-    store.set('geminiApiKey', safeStorage.encryptString(apiKey).toString('base64'))
+  ipcMain.handle(IPC.SET_GEMINI_KEY, async (_e, apiKey: string) => {
+    store.set('geminiApiKey', await encryptKey(apiKey))
     geminiAI = null
   })
   ipcMain.handle(IPC.GET_AI_PROVIDER, () => store.get('aiProvider', 'claude'))
