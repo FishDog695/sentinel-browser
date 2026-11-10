@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
-import type { CookieEvent } from '../../../../../shared/ipcEvents'
+import type { CookieEvent } from '@shared/ipcEvents'
 
 const EMPTY_MAP = new Map<string, CookieEvent>()
 
