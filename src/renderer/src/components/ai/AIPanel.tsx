@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
 import { ipc } from '../../lib/ipc'
-import type { AIAnalysisRequest, CookieEvent, NetworkRequest, TrackerDetection, FingerprintEvent, TechDetection } from '../../../../../shared/ipcEvents'
+import type { AIAnalysisRequest, CookieEvent, NetworkRequest, TrackerDetection, FingerprintEvent, TechDetection } from '@shared/ipcEvents'
 
 const EMPTY_COOKIES = new Map<string, CookieEvent>()
 const EMPTY_REQUESTS: NetworkRequest[] = []

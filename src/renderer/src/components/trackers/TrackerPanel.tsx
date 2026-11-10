@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useSiteStore } from '../../store/siteStore'
-import type { TrackerDetection, FingerprintEvent } from '../../../../../shared/ipcEvents'
+import type { TrackerDetection, FingerprintEvent } from '@shared/ipcEvents'
 
 const EMPTY_TRACKERS = new Map<string, TrackerDetection>()
 const EMPTY_FP: FingerprintEvent[] = []

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type {
   CookieEvent, NetworkRequest, NetworkResponse,
   TrackerDetection, FingerprintEvent, TechDetection, Favorite, HistoryEntry
-} from '../../../shared/ipcEvents'
+} from '@shared/ipcEvents'
 
 export type { Favorite, HistoryEntry }
 

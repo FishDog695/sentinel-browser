@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSiteStore } from '../../store/siteStore'
-import type { NetworkRequest, NetworkResponse } from '../../../../../shared/ipcEvents'
+import type { NetworkRequest, NetworkResponse } from '@shared/ipcEvents'
 
 type Filter = 'all' | 'third' | 'xhr' | 'script' | 'image'
 
