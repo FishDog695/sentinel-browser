@@ -271,7 +271,7 @@ app.on('before-quit', async (e) => {
       ses.clearCache(),
       ses.clearAuthCache(),
       ses.clearStorageData({
-        storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage', 'serviceworkers', 'shadercache', 'websql', 'filesystem'],
+        storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage', 'serviceworkers', 'shadercache', 'filesystem'],
       }),
     ])
     if (getClearHistoryOnClose()) {
