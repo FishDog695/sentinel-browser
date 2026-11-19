@@ -1,7 +1,7 @@
 // Typed wrappers around window.electronAPI
 // The renderer never imports from 'electron' directly
 
-import type { Favorite, HistoryEntry } from '../../../shared/ipcEvents'
+import type { Favorite, HistoryEntry } from '@shared/ipcEvents'
 
 declare global {
   interface Window {

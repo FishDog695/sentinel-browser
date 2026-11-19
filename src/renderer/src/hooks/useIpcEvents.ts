@@ -4,7 +4,7 @@ import { ipc } from '../lib/ipc'
 import type {
   CookieEvent, NetworkRequest, NetworkResponse,
   TrackerDetection, FingerprintEvent, TechDetection, TabInfo
-} from '../../../../shared/ipcEvents'
+} from '@shared/ipcEvents'
 
 // Single hook that wires up ALL IPC push events to the Zustand store
 export function useIpcEvents() {
